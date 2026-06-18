@@ -1729,6 +1729,40 @@ textarea {
   }
 }
 
+@media (max-width: 960px) {
+  .age-gate {
+    grid-template-columns: 1fr;
+    min-height: auto;
+    padding: 24px;
+    gap: 20px;
+  }
+
+  .age-panel,
+  .age-side {
+    width: 100%;
+    max-width: none;
+  }
+
+  .age-panel {
+    padding: 34px;
+  }
+
+  .age-brand {
+    margin-bottom: 46px;
+  }
+
+  .age-side {
+    min-height: 430px;
+    padding: 34px;
+  }
+
+  .age-side p {
+    right: 34px;
+    bottom: 34px;
+    left: 34px;
+  }
+}
+
 @media (max-width: 760px) {
   .app-shell {
     padding: 14px;
