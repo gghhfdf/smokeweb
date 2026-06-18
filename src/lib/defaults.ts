@@ -1,16 +1,71 @@
-import type { Product, SiteSettings } from "./types";
+import type { AccentTheme, FontPreset, Product, SiteSettings } from "./types";
 
 export const defaultSettings: SiteSettings = {
   brandName: "Cabinet Ops",
   heroTitle: "白金典藏系列",
   heroBody: "精选成人烟草产品展示，统一维护规格、状态、库存和商品图片。",
-  accentTheme: "sage",
-  fontPreset: "heritage",
+  accentTheme: "wenkai-sage",
+  fontPreset: "wenkai",
   requireAgeGate: true,
   gridDensity: "editorial",
   showStock: true,
   showPrice: true,
 };
+
+const themeAliases: Record<string, AccentTheme> = {
+  sage: "wenkai-sage",
+  champagne: "mashan-amber",
+  graphite: "xiaowei-porcelain",
+};
+
+const fontAliases: Record<string, FontPreset> = {
+  heritage: "wenkai",
+  modern: "kuaile",
+  editorial: "xiaowei",
+};
+
+const themeValues = new Set<AccentTheme>([
+  "wenkai-sage",
+  "kuaile-peach",
+  "xiaowei-porcelain",
+  "mashan-amber",
+  "longcang-ink",
+]);
+
+const fontValues = new Set<FontPreset>([
+  "wenkai",
+  "kuaile",
+  "xiaowei",
+  "mashan",
+  "longcang",
+]);
+
+function normalizeAccentTheme(value: unknown): AccentTheme {
+  if (typeof value !== "string") return defaultSettings.accentTheme;
+  if (themeValues.has(value as AccentTheme)) return value as AccentTheme;
+  return themeAliases[value] ?? defaultSettings.accentTheme;
+}
+
+function normalizeFontPreset(value: unknown): FontPreset {
+  if (typeof value !== "string") return defaultSettings.fontPreset;
+  if (fontValues.has(value as FontPreset)) return value as FontPreset;
+  return fontAliases[value] ?? defaultSettings.fontPreset;
+}
+
+export function normalizeSettings(
+  settings?: Partial<SiteSettings> | null,
+): SiteSettings {
+  const merged = {
+    ...defaultSettings,
+    ...(settings ?? {}),
+  };
+
+  return {
+    ...merged,
+    accentTheme: normalizeAccentTheme(merged.accentTheme),
+    fontPreset: normalizeFontPreset(merged.fontPreset),
+  };
+}
 
 export const initialProducts: Product[] = [
   {

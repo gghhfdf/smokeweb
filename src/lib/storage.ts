@@ -1,4 +1,4 @@
-import { defaultSettings, initialProducts } from "./defaults";
+import { defaultSettings, initialProducts, normalizeSettings } from "./defaults";
 import {
   getCloudImageDataUrl,
   importCloudPayload,
@@ -63,10 +63,9 @@ export function loadAppState(): AppState {
   return {
     adminUser: readJson<AdminUser | null>(keys.admin, null),
     products: readJson<Product[]>(keys.products, initialProducts),
-    settings: {
-      ...defaultSettings,
-      ...readJson<Partial<SiteSettings>>(keys.settings, defaultSettings),
-    },
+    settings: normalizeSettings(
+      readJson<Partial<SiteSettings>>(keys.settings, defaultSettings),
+    ),
     ageVerified: readJson<boolean>(keys.ageVerified, false),
     sessionUserId: readJson<string | null>(keys.session, null),
   };
@@ -276,10 +275,7 @@ export async function importPayload(payload: ExportPayload): Promise<AppState> {
 
   saveAdmin(compressedPayload.adminUser);
   saveProducts(compressedPayload.products);
-  const settings = {
-    ...defaultSettings,
-    ...compressedPayload.settings,
-  };
+  const settings = normalizeSettings(compressedPayload.settings);
 
   saveSettings(settings);
   saveAgeVerified(compressedPayload.ageVerified);

@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { defaultSettings } from "./defaults";
+import { normalizeSettings } from "./defaults";
 import {
   blobToDataUrl,
   compressImageFile,
@@ -73,10 +73,7 @@ function normalizeState(state: AppState): AppState {
   return {
     ...state,
     products: state.products ?? [],
-    settings: {
-      ...defaultSettings,
-      ...state.settings,
-    },
+    settings: normalizeSettings(state.settings),
     ageVerified: false,
   };
 }

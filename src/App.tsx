@@ -116,22 +116,34 @@ const themeOptions: Array<{
   swatches: string[];
 }> = [
   {
-    value: "sage",
-    label: "鼠尾草绿",
-    body: "暖白底色、深绿主按钮，适合高级橱窗展示。",
-    swatches: ["#f6f4ee", "#1f2b27", "#b68a42"],
+    value: "wenkai-sage",
+    label: "文楷鼠尾草",
+    body: "暖白、深绿、浅金，适合文艺高级的品牌橱窗。",
+    swatches: ["#f7f4ec", "#1f2b27", "#b68a42"],
   },
   {
-    value: "champagne",
-    label: "香槟金",
-    body: "更明亮的米金光感，突出礼盒和限量系列。",
-    swatches: ["#fbf7ee", "#3a2c1c", "#c99a4a"],
+    value: "kuaile-peach",
+    label: "快乐蜜桃",
+    body: "蜜桃、奶白、浆果红，适合更亲和灵动的展示氛围。",
+    swatches: ["#fff3ed", "#913f4f", "#f0a88f"],
   },
   {
-    value: "graphite",
-    label: "石墨白",
-    body: "偏冷静的白灰秩序感，适合运营后台和大表格。",
-    swatches: ["#f3f5f4", "#181c1d", "#8e9895"],
+    value: "xiaowei-porcelain",
+    label: "小薇瓷白",
+    body: "瓷白、青蓝、淡墨，适合东方杂志感和后台秩序。",
+    swatches: ["#f8f7f2", "#163f52", "#8aa9a7"],
+  },
+  {
+    value: "mashan-amber",
+    label: "马善政琥珀",
+    body: "宣纸、琥珀、朱砂，适合古风礼盒和限量陈列。",
+    swatches: ["#fbf1dc", "#6b2f24", "#d59b4a"],
+  },
+  {
+    value: "longcang-ink",
+    label: "龙藏墨青",
+    body: "月白、墨青、青铜，适合书卷气和收藏感展示。",
+    swatches: ["#f2f5f1", "#142d2d", "#7f936c"],
   },
 ];
 
@@ -142,22 +154,34 @@ const fontOptions: Array<{
   body: string;
 }> = [
   {
-    value: "heritage",
-    label: "典藏宋体",
+    value: "wenkai",
+    label: "霞鹜文楷",
     sample: "白金典藏",
-    body: "标题更有东方陈列感，适合高端品牌橱窗。",
+    body: "楷意轻柔，中文正文和标题都更温润耐看。",
   },
   {
-    value: "modern",
-    label: "现代无衬线",
-    sample: "Cabinet Ops",
-    body: "信息密度更高，适合日常商品运营维护。",
+    value: "kuaile",
+    label: "站酷快乐体",
+    sample: "暖白橱窗",
+    body: "可爱、圆润、有识别度，用于标题时更有亲和力。",
   },
   {
-    value: "editorial",
-    label: "杂志衬线",
-    sample: "Premium",
-    body: "更偏编辑画册气质，适合礼盒和系列故事展示。",
+    value: "xiaowei",
+    label: "站酷小薇",
+    sample: "东方礼盒",
+    body: "细长宋意，适合高端画册、分类标题和品牌名。",
+  },
+  {
+    value: "mashan",
+    label: "马善政毛笔",
+    sample: "云端典藏",
+    body: "书法感强，适合古风主标题和限量款氛围。",
+  },
+  {
+    value: "longcang",
+    label: "龙藏手书",
+    sample: "山月烟岚",
+    body: "笔势飘逸，适合更传统、更有收藏感的展示页。",
   },
 ];
 

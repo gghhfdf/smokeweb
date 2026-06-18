@@ -1,7 +1,12 @@
 export type ProductStatus = "live" | "draft";
-export type AccentTheme = "sage" | "champagne" | "graphite";
+export type AccentTheme =
+  | "wenkai-sage"
+  | "kuaile-peach"
+  | "xiaowei-porcelain"
+  | "mashan-amber"
+  | "longcang-ink";
 export type GridDensity = "editorial" | "compact";
-export type FontPreset = "heritage" | "modern" | "editorial";
+export type FontPreset = "wenkai" | "kuaile" | "xiaowei" | "mashan" | "longcang";
 
 export interface AdminUser {
   id: string;

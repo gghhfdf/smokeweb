@@ -41,13 +41,46 @@
   --motion-slow: 320ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.2, 0.9, 0.2, 1.12);
-  --font-ui: "Microsoft YaHei UI", "Segoe UI", sans-serif;
-  --font-display: "FangSong", "STFangsong", "Songti SC", serif;
-  --font-brand: Georgia, "Times New Roman", serif;
+  --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-display: "LXGW WenKai", "Noto Serif SC", "Songti SC", serif;
+  --font-brand: "LXGW WenKai", "Noto Serif SC", serif;
   font-family: var(--font-ui);
   background: var(--bg-canvas);
   color: var(--text-primary);
 }
+
+@font-face {
+  font-family: "ZCOOL KuaiLe";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/zcool-kuaile/files/zcool-kuaile-chinese-simplified-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "ZCOOL XiaoWei";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/zcool-xiaowei/files/zcool-xiaowei-chinese-simplified-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Ma Shan Zheng";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/ma-shan-zheng/files/ma-shan-zheng-chinese-simplified-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Long Cang";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("@fontsource/long-cang/files/long-cang-chinese-simplified-400-normal.woff2") format("woff2");
+}
+
 
 * {
   box-sizing: border-box;
@@ -84,7 +117,7 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
-.theme-sage {
+.theme-wenkai-sage {
   --bg-canvas: #f6f4ee;
   --bg-surface: rgba(255, 255, 255, 0.86);
   --bg-raised: #ffffff;
@@ -95,89 +128,161 @@ select:focus-visible {
   --accent-soft: #eadcc0;
 }
 
-.theme-champagne {
-  --bg-canvas: #faf5eb;
-  --bg-surface: rgba(255, 252, 246, 0.9);
-  --bg-raised: #fffdf8;
-  --bg-soft: #f2e7d4;
-  --text-secondary: #675b4d;
-  --text-muted: #897b69;
-  --border-subtle: rgba(73, 55, 31, 0.09);
-  --border-default: rgba(73, 55, 31, 0.16);
-  --accent: #be8f42;
-  --accent-soft: #efe0bf;
-  --brand: #2d261b;
-  --brand-hover: #3a3022;
-  --focus-ring: rgba(190, 143, 66, 0.3);
-  --canvas-wash-start: rgba(255, 253, 248, 0.84);
-  --canvas-wash-end: rgba(245, 235, 218, 0.94);
-  --grid-line: rgba(128, 94, 45, 0.045);
-  --nav-wash-start: rgba(255, 252, 245, 0.98);
-  --nav-wash-end: rgba(255, 248, 236, 0.84);
-  --age-wash-left: rgba(255, 252, 244, 0.98);
-  --age-wash-right: rgba(246, 231, 204, 0.92);
-  --age-card-base: #fbf1dd;
-  --image-empty-bg: #f4ead8;
+.theme-kuaile-peach {
+  --bg-canvas: #fff4ed;
+  --bg-surface: rgba(255, 255, 255, 0.88);
+  --bg-raised: #fffdfb;
+  --bg-soft: #f8e2d6;
+  --text-primary: #271816;
+  --text-secondary: #765854;
+  --text-muted: #9b7a73;
+  --border-subtle: rgba(117, 66, 58, 0.09);
+  --border-default: rgba(117, 66, 58, 0.16);
+  --brand: #913f4f;
+  --brand-hover: #7b3443;
+  --accent: #e28a6b;
+  --accent-soft: #f7d5c7;
+  --focus-ring: rgba(226, 138, 107, 0.34);
+  --canvas-wash-start: rgba(255, 252, 248, 0.86);
+  --canvas-wash-end: rgba(252, 230, 219, 0.94);
+  --grid-line: rgba(145, 63, 79, 0.04);
+  --nav-wash-start: rgba(255, 250, 246, 0.98);
+  --nav-wash-end: rgba(255, 242, 235, 0.84);
+  --age-wash-left: rgba(255, 251, 247, 0.98);
+  --age-wash-right: rgba(251, 225, 214, 0.92);
+  --age-card-base: #fff0e8;
+  --image-empty-bg: #f7e5dc;
 }
 
-.theme-graphite {
-  --bg-canvas: #f2f4f3;
+.theme-xiaowei-porcelain {
+  --bg-canvas: #f7f7f2;
   --bg-surface: rgba(255, 255, 255, 0.9);
   --bg-raised: #ffffff;
-  --bg-soft: #e8ecea;
-  --text-primary: #101315;
-  --text-secondary: #53605d;
-  --text-muted: #78827f;
-  --border-subtle: rgba(16, 19, 21, 0.08);
-  --border-default: rgba(16, 19, 21, 0.15);
-  --accent: #8e9895;
-  --accent-soft: #dde2df;
-  --brand: #181c1d;
-  --brand-hover: #242a2b;
-  --focus-ring: rgba(91, 107, 102, 0.34);
-  --canvas-wash-start: rgba(255, 255, 255, 0.82);
-  --canvas-wash-end: rgba(229, 234, 232, 0.94);
-  --grid-line: rgba(16, 19, 21, 0.04);
-  --nav-wash-start: rgba(249, 251, 250, 0.98);
-  --nav-wash-end: rgba(241, 245, 243, 0.84);
-  --age-wash-left: rgba(255, 255, 255, 0.98);
-  --age-wash-right: rgba(227, 233, 231, 0.92);
-  --age-card-base: #eef2f0;
-  --image-empty-bg: #edf1ef;
+  --bg-soft: #e9eeee;
+  --text-primary: #10222b;
+  --text-secondary: #51676c;
+  --text-muted: #788b8f;
+  --border-subtle: rgba(22, 63, 82, 0.08);
+  --border-default: rgba(22, 63, 82, 0.15);
+  --brand: #163f52;
+  --brand-hover: #0f3343;
+  --accent: #8aa9a7;
+  --accent-soft: #dce8e6;
+  --focus-ring: rgba(62, 112, 128, 0.32);
+  --canvas-wash-start: rgba(255, 255, 252, 0.86);
+  --canvas-wash-end: rgba(231, 239, 238, 0.94);
+  --grid-line: rgba(22, 63, 82, 0.04);
+  --nav-wash-start: rgba(252, 253, 250, 0.98);
+  --nav-wash-end: rgba(241, 247, 246, 0.84);
+  --age-wash-left: rgba(255, 255, 251, 0.98);
+  --age-wash-right: rgba(226, 238, 237, 0.92);
+  --age-card-base: #eef5f3;
+  --image-empty-bg: #eaf1ef;
 }
 
-.font-heritage {
-  --font-ui: "Microsoft YaHei UI", "Segoe UI", sans-serif;
-  --font-display: "FangSong", "STFangsong", "Songti SC", serif;
-  --font-brand: Georgia, "Times New Roman", serif;
+.theme-mashan-amber {
+  --bg-canvas: #fbf1dc;
+  --bg-surface: rgba(255, 250, 241, 0.9);
+  --bg-raised: #fffdf7;
+  --bg-soft: #f2dfbf;
+  --text-primary: #2c1b14;
+  --text-secondary: #715845;
+  --text-muted: #957b61;
+  --border-subtle: rgba(107, 47, 36, 0.09);
+  --border-default: rgba(107, 47, 36, 0.17);
+  --brand: #6b2f24;
+  --brand-hover: #57251d;
+  --accent: #d59b4a;
+  --accent-soft: #efd8ac;
+  --focus-ring: rgba(177, 93, 57, 0.34);
+  --canvas-wash-start: rgba(255, 251, 241, 0.86);
+  --canvas-wash-end: rgba(245, 224, 189, 0.94);
+  --grid-line: rgba(107, 47, 36, 0.04);
+  --nav-wash-start: rgba(255, 251, 243, 0.98);
+  --nav-wash-end: rgba(250, 235, 209, 0.84);
+  --age-wash-left: rgba(255, 251, 243, 0.98);
+  --age-wash-right: rgba(244, 222, 185, 0.92);
+  --age-card-base: #fbecd1;
+  --image-empty-bg: #f1dfbf;
+}
+
+.theme-longcang-ink {
+  --bg-canvas: #f2f5f1;
+  --bg-surface: rgba(255, 255, 255, 0.9);
+  --bg-raised: #ffffff;
+  --bg-soft: #e7ece2;
+  --text-primary: #101d1d;
+  --text-secondary: #526462;
+  --text-muted: #75837e;
+  --border-subtle: rgba(20, 45, 45, 0.08);
+  --border-default: rgba(20, 45, 45, 0.16);
+  --brand: #142d2d;
+  --brand-hover: #1c3b3b;
+  --accent: #7f936c;
+  --accent-soft: #dfe8d5;
+  --focus-ring: rgba(91, 125, 101, 0.34);
+  --canvas-wash-start: rgba(255, 255, 253, 0.84);
+  --canvas-wash-end: rgba(229, 238, 226, 0.94);
+  --grid-line: rgba(20, 45, 45, 0.04);
+  --nav-wash-start: rgba(250, 253, 249, 0.98);
+  --nav-wash-end: rgba(239, 247, 236, 0.84);
+  --age-wash-left: rgba(255, 255, 253, 0.98);
+  --age-wash-right: rgba(224, 235, 221, 0.92);
+  --age-card-base: #eef4e9;
+  --image-empty-bg: #e7efdf;
+}
+
+.font-wenkai {
+  --font-ui: "LXGW WenKai", "Noto Sans SC Variable", "Microsoft YaHei UI", sans-serif;
+  --font-display: "LXGW WenKai", "Noto Serif SC", "Songti SC", serif;
+  --font-brand: "LXGW WenKai", "Noto Serif SC", serif;
   font-family: var(--font-ui);
 }
 
-.font-modern {
-  --font-ui: "Inter", "Microsoft YaHei UI", "Segoe UI", Arial, sans-serif;
-  --font-display: "Microsoft YaHei UI", "Segoe UI", Arial, sans-serif;
-  --font-brand: "Segoe UI", "Microsoft YaHei UI", Arial, sans-serif;
+.font-kuaile {
+  --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-display: "ZCOOL KuaiLe", "Noto Sans SC Variable", sans-serif;
+  --font-brand: "ZCOOL KuaiLe", "Noto Sans SC Variable", sans-serif;
   font-family: var(--font-ui);
 }
 
-.font-editorial {
-  --font-ui: "Noto Serif SC", "Songti SC", "SimSun", serif;
-  --font-display: Georgia, "Times New Roman", "Songti SC", serif;
-  --font-brand: Georgia, "Times New Roman", "Songti SC", serif;
+.font-xiaowei {
+  --font-ui: "Noto Serif SC", "Noto Sans SC Variable", "Songti SC", serif;
+  --font-display: "ZCOOL XiaoWei", "Noto Serif SC", "Songti SC", serif;
+  --font-brand: "ZCOOL XiaoWei", "Noto Serif SC", serif;
   font-family: var(--font-ui);
 }
 
-.font-modern .age-copy h1 {
-  font-size: clamp(40px, 4.6vw, 64px);
-  font-weight: 600;
-  line-height: 1.12;
+.font-mashan {
+  --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-display: "Ma Shan Zheng", "Noto Serif SC", "Songti SC", serif;
+  --font-brand: "Ma Shan Zheng", "Noto Serif SC", serif;
+  font-family: var(--font-ui);
 }
 
-.font-modern .hero-copy h1,
-.font-modern .admin-intro h1,
-.font-modern .settings-intro h1 {
-  font-weight: 600;
-  line-height: 1.14;
+.font-longcang {
+  --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-display: "Long Cang", "LXGW WenKai", "Noto Serif SC", serif;
+  --font-brand: "Long Cang", "LXGW WenKai", serif;
+  font-family: var(--font-ui);
+}
+
+.font-kuaile .age-copy h1,
+.font-kuaile .hero-copy h1,
+.font-kuaile .admin-intro h1,
+.font-kuaile .settings-intro h1 {
+  letter-spacing: 0.02em;
+  line-height: 1.16;
+}
+
+.font-mashan .age-copy h1,
+.font-longcang .age-copy h1 {
+  line-height: 1.02;
+}
+
+.font-mashan .hero-copy h1,
+.font-longcang .hero-copy h1 {
+  line-height: 1.08;
 }
 
 .app-shell {
@@ -470,11 +575,11 @@ select:focus-visible {
   height: 44px;
   border: 1px solid var(--text-primary);
   border-radius: var(--radius-sm);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-brand);
 }
 
 .age-brand strong {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-brand);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -532,13 +637,13 @@ select:focus-visible {
 
 .age-side span {
   color: var(--accent);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-brand);
 }
 
 .age-side strong {
   display: block;
   margin-top: 12px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
   font-size: 42px;
 }
 
@@ -813,7 +918,7 @@ textarea {
 .stat-card strong {
   display: block;
   margin-top: 12px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
   font-size: 42px;
   font-weight: 500;
 }
@@ -1297,16 +1402,24 @@ textarea {
   line-height: 1.08;
 }
 
-.font-sample-heritage b {
-  font-family: "FangSong", "STFangsong", "Songti SC", serif;
+.font-sample-wenkai b {
+  font-family: "LXGW WenKai", "Noto Serif SC", serif;
 }
 
-.font-sample-modern b {
-  font-family: "Microsoft YaHei UI", "Segoe UI", Arial, sans-serif;
+.font-sample-kuaile b {
+  font-family: "ZCOOL KuaiLe", "Noto Sans SC Variable", sans-serif;
 }
 
-.font-sample-editorial b {
-  font-family: Georgia, "Times New Roman", "Songti SC", serif;
+.font-sample-xiaowei b {
+  font-family: "ZCOOL XiaoWei", "Noto Serif SC", serif;
+}
+
+.font-sample-mashan b {
+  font-family: "Ma Shan Zheng", "Noto Serif SC", serif;
+}
+
+.font-sample-longcang b {
+  font-family: "Long Cang", "LXGW WenKai", serif;
 }
 
 .switch-row,
@@ -1421,7 +1534,7 @@ textarea {
 
 .drawer-header span {
   color: var(--accent);
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-brand);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }

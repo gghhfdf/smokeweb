@@ -9,9 +9,15 @@
     "lint": "eslint . --ext ts,tsx --max-warnings 0"
   },
   "dependencies": {
+    "@fontsource-variable/noto-sans-sc": "^5.2.10",
+    "@fontsource/long-cang": "^5.2.8",
+    "@fontsource/ma-shan-zheng": "^5.2.9",
+    "@fontsource/zcool-kuaile": "^5.2.8",
+    "@fontsource/zcool-xiaowei": "^5.2.8",
     "@supabase/supabase-js": "^2.108.2",
     "@vitejs/plugin-react": "^6.0.2",
     "lucide-react": "^0.468.0",
+    "lxgw-wenkai-webfont": "^1.7.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "typescript": "^5.7.2",
