@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { normalizeSettings } from "./defaults";
+import { normalizeProducts, normalizeSettings } from "./defaults";
 import {
   blobToDataUrl,
   compressImageFile,
@@ -72,7 +72,7 @@ function setCloudSessionToken(token: string | null) {
 function normalizeState(state: AppState): AppState {
   return {
     ...state,
-    products: state.products ?? [],
+    products: normalizeProducts(state.products),
     settings: normalizeSettings(state.settings),
     ageVerified: false,
   };
@@ -156,11 +156,13 @@ export async function setCloudProductStatus(
 
 export async function bulkCloudProductStatus(
   status: Product["status"],
+  productIds?: string[],
 ): Promise<AppState> {
   return normalizeState(
     await rpc<AppState>("cabinet_bulk_status", {
       p_session_token: getCloudSessionToken(),
       p_status: status,
+      p_product_ids: productIds?.length ? productIds : null,
     }),
   );
 }

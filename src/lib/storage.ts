@@ -1,4 +1,9 @@
-import { defaultSettings, initialProducts, normalizeSettings } from "./defaults";
+import {
+  defaultSettings,
+  initialProducts,
+  normalizeProducts,
+  normalizeSettings,
+} from "./defaults";
 import {
   getCloudImageDataUrl,
   importCloudPayload,
@@ -62,7 +67,7 @@ function writeJson<T>(key: string, value: T): void {
 export function loadAppState(): AppState {
   return {
     adminUser: readJson<AdminUser | null>(keys.admin, null),
-    products: readJson<Product[]>(keys.products, initialProducts),
+    products: normalizeProducts(readJson<Product[]>(keys.products, initialProducts)),
     settings: normalizeSettings(
       readJson<Partial<SiteSettings>>(keys.settings, defaultSettings),
     ),
@@ -76,7 +81,7 @@ export function saveAdmin(admin: AdminUser | null): void {
 }
 
 export function saveProducts(products: Product[]): void {
-  writeJson(keys.products, products);
+  writeJson(keys.products, normalizeProducts(products));
 }
 
 export function saveSettings(settings: SiteSettings): void {
@@ -214,11 +219,11 @@ export async function buildExportPayload(
   );
 
   return {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     adminUser: state.adminUser,
-    products: state.products,
-    settings: state.settings,
+    products: normalizeProducts(state.products),
+    settings: normalizeSettings(state.settings),
     ageVerified: state.ageVerified,
     images,
   };
@@ -248,14 +253,21 @@ async function compressImportPayload(payload: ExportPayload): Promise<ExportPayl
 }
 
 export async function importPayload(payload: ExportPayload): Promise<AppState> {
-  if (payload.version !== 1) {
+  if (payload.version !== 1 && payload.version !== 2) {
     throw new Error("不支持的数据版本。");
   }
 
   const compressedPayload = await compressImportPayload(payload);
+  const products = normalizeProducts(compressedPayload.products);
+  const settings = normalizeSettings(compressedPayload.settings);
 
   if (isCloudEnabled) {
-    return importCloudPayload(compressedPayload);
+    return importCloudPayload({
+      ...compressedPayload,
+      version: 2,
+      products,
+      settings,
+    });
   }
 
   await clearImages();
@@ -274,8 +286,7 @@ export async function importPayload(payload: ExportPayload): Promise<AppState> {
   );
 
   saveAdmin(compressedPayload.adminUser);
-  saveProducts(compressedPayload.products);
-  const settings = normalizeSettings(compressedPayload.settings);
+  saveProducts(products);
 
   saveSettings(settings);
   saveAgeVerified(compressedPayload.ageVerified);
@@ -283,7 +294,7 @@ export async function importPayload(payload: ExportPayload): Promise<AppState> {
 
   return {
     adminUser: compressedPayload.adminUser,
-    products: compressedPayload.products,
+    products,
     settings,
     ageVerified: compressedPayload.ageVerified,
     sessionUserId: null,

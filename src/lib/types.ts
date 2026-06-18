@@ -7,6 +7,8 @@ export type AccentTheme =
   | "longcang-ink";
 export type GridDensity = "editorial" | "compact";
 export type FontPreset = "wenkai" | "kuaile" | "xiaowei" | "mashan" | "longcang";
+export type HeroLayout = "editorial" | "catalog" | "minimal";
+export type ProductSort = "manual" | "updated" | "name" | "price";
 
 export interface AdminUser {
   id: string;
@@ -29,6 +31,11 @@ export interface Product {
   description: string;
   imageIds: string[];
   coverImageId?: string;
+  tags?: string[];
+  sortOrder?: number;
+  origin?: string;
+  flavorNotes?: string;
+  imageMeta?: Record<string, { alt?: string; note?: string }>;
   updatedAt: string;
 }
 
@@ -40,8 +47,12 @@ export interface SiteSettings {
   fontPreset: FontPreset;
   requireAgeGate: boolean;
   gridDensity: GridDensity;
+  heroLayout: HeroLayout;
+  defaultSort: ProductSort;
   showStock: boolean;
   showPrice: boolean;
+  showOrigin: boolean;
+  showFlavorNotes: boolean;
 }
 
 export interface AppState {
@@ -76,7 +87,7 @@ export interface ImageCompressionStats {
 }
 
 export interface ExportPayload {
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   adminUser: AdminUser | null;
   products: Product[];

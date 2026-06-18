@@ -29,6 +29,7 @@ export default [
         FileReader: "readonly",
         CanvasImageSource: "readonly",
         HTMLCanvasElement: "readonly",
+        HTMLDivElement: "readonly",
         HTMLInputElement: "readonly",
         Image: "readonly",
         TextEncoder: "readonly",

@@ -4,6 +4,7 @@ import {
   Check,
   ChevronRight,
   Cloud,
+  Copy,
   Download,
   Eye,
   EyeOff,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import {
   ChangeEvent,
+  DragEvent,
   FormEvent,
   ReactNode,
   useEffect,
@@ -78,6 +80,7 @@ import type {
   GridDensity,
   ImageCompressionStats,
   Product,
+  ProductSort,
   ProductStatus,
   SiteSettings,
 } from "./lib/types";
@@ -115,6 +118,11 @@ const blankProduct: Omit<Product, "id" | "updatedAt"> = {
   featured: false,
   description: "",
   imageIds: [],
+  tags: [],
+  sortOrder: 0,
+  origin: "",
+  flavorNotes: "",
+  imageMeta: {},
 };
 
 const themeOptions: Array<{
@@ -370,7 +378,7 @@ export function App() {
   function requireAdmin(nextView: View = "admin"): boolean {
     if (!isAuthed) {
       setView("login");
-      pushToast("请先登录管理席。", "warning");
+      pushToast("请先登录管理员。", "warning");
       return false;
     }
     setView(nextView);
@@ -380,7 +388,7 @@ export function App() {
   function checkAdmin(): boolean {
     if (!isAuthed) {
       setView("login");
-      pushToast("请先登录管理席。", "warning");
+      pushToast("请先登录管理员。", "warning");
       return false;
     }
     return true;
@@ -392,9 +400,9 @@ export function App() {
         const cloudState = await createCloudAdmin(admin);
         applyCloudState(cloudState);
         setView("storefront");
-        pushToast("管理席已创建。");
+        pushToast("管理员已创建。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "管理席创建失败。", "danger");
+        pushToast(error instanceof Error ? error.message : "管理员创建失败。", "danger");
       }
       return;
     }
@@ -407,7 +415,7 @@ export function App() {
     saveAdmin(admin);
     saveSession(admin.id);
     setView("storefront");
-    pushToast("管理席已创建。");
+    pushToast("管理员已创建。");
   }
 
   async function handleLogin(username: string, password: string) {
@@ -418,7 +426,7 @@ export function App() {
         const cloudState = await loginCloudAdmin(username.trim(), passwordHash);
         applyCloudState(cloudState);
         setView("storefront");
-        pushToast("已进入管理席。");
+        pushToast("已进入管理员。");
       } catch {
         pushToast("用户名或密码不正确。", "danger");
       }
@@ -432,7 +440,7 @@ export function App() {
       setState((current) => ({ ...current, sessionUserId: state.adminUser!.id }));
       saveSession(state.adminUser.id);
       setView("storefront");
-      pushToast("已进入管理席。");
+    pushToast("已进入管理员。");
       return;
     }
     pushToast("用户名或密码不正确。", "danger");
@@ -446,14 +454,14 @@ export function App() {
         setState((current) => ({ ...current, sessionUserId: null }));
       }
       setView("storefront");
-      pushToast("已退出管理席。", "warning");
+      pushToast("已退出管理员。", "warning");
       return;
     }
 
     setState((current) => ({ ...current, sessionUserId: null }));
     saveSession(null);
     setView("storefront");
-    pushToast("已退出管理席。", "warning");
+    pushToast("已退出管理员。", "warning");
   }
 
   function handleAgeVerified() {
@@ -525,10 +533,11 @@ export function App() {
     pushToast("展示状态已更新。");
   }
 
-  async function performBulkStatus(status: ProductStatus) {
+  async function performBulkStatus(status: ProductStatus, productIds?: string[]) {
+    const targetIds = productIds?.length ? productIds : undefined;
     if (isCloudEnabled) {
       try {
-        applyCloudState(await bulkCloudProductStatus(status));
+        applyCloudState(await bulkCloudProductStatus(status, targetIds));
         pushToast(status === "live" ? "已批量上架。" : "已批量下架。");
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "批量操作失败。", "danger");
@@ -537,23 +546,83 @@ export function App() {
     }
 
     updateProducts(
-      state.products.map((product) => ({
-        ...product,
-        status,
-        updatedAt: new Date().toISOString(),
-      })),
+      state.products.map((product) =>
+        !targetIds || targetIds.includes(product.id)
+          ? {
+              ...product,
+              status,
+              updatedAt: new Date().toISOString(),
+            }
+          : product,
+      ),
     );
     pushToast(status === "live" ? "全部商品已上架。" : "全部商品已下架。");
   }
 
-  function handleBulkStatus(status: ProductStatus) {
+  function handleBulkStatus(status: ProductStatus, productIds?: string[]) {
     if (!checkAdmin()) return;
+    const targetCount = productIds?.length ?? state.products.length;
+    if (!targetCount) {
+      pushToast("没有可操作的商品。", "warning");
+      return;
+    }
     const actionText = status === "live" ? "批量上架" : "批量下架";
     setConfirmAction({
       title: `${actionText}全部商品？`,
       body: `这会把当前商品列表全部切换为${status === "live" ? "已上架" : "未上架"}状态，确认后立即生效。`,
-      action: () => performBulkStatus(status),
+      action: () => performBulkStatus(status, productIds),
     });
+  }
+
+  async function performBulkDelete(productIds: string[]) {
+    if (!productIds.length) return;
+    if (isCloudEnabled) {
+      try {
+        let nextState: AppState | null = null;
+        for (const productId of productIds) {
+          nextState = await deleteCloudProduct(productId);
+        }
+        if (nextState) applyCloudState(nextState);
+        pushToast(`已删除 ${productIds.length} 个商品。`, "warning");
+      } catch (error) {
+        pushToast(error instanceof Error ? error.message : "批量删除失败。", "danger");
+      }
+      return;
+    }
+
+    const deleting = state.products.filter((product) => productIds.includes(product.id));
+    await Promise.all(deleting.flatMap((product) => product.imageIds.map((id) => removeImage(id))));
+    const products = state.products.filter((product) => !productIds.includes(product.id));
+    updateProducts(products);
+    setSelectedProductId(products[0]?.id ?? null);
+    pushToast(`已删除 ${productIds.length} 个商品。`, "warning");
+  }
+
+  function handleBulkDelete(productIds: string[]) {
+    if (!checkAdmin()) return;
+    if (!productIds.length) {
+      pushToast("请先选择要删除的商品。", "warning");
+      return;
+    }
+    setConfirmAction({
+      title: `删除 ${productIds.length} 个商品？`,
+      body: "删除后会同时移除关联图片，操作不可撤销。建议先导出备份。",
+      action: () => performBulkDelete(productIds),
+    });
+  }
+
+  async function handleDuplicateProduct(product: Product) {
+    if (!checkAdmin()) return;
+    const copy: Product = {
+      ...product,
+      id: `product-${crypto.randomUUID()}`,
+      name: `${product.name} 副本`,
+      status: "draft",
+      featured: false,
+      sortOrder: state.products.length,
+      updatedAt: new Date().toISOString(),
+    };
+    await handleSaveProduct(copy);
   }
 
   function handleDeleteProduct(product: Product) {
@@ -581,7 +650,7 @@ export function App() {
     if (!checkAdmin()) return;
     setConfirmAction({
       title: "清空全部资料？",
-      body: "这会删除管理席、商品、设置和所有上传图片。请先导出备份。",
+      body: "这会删除管理员、商品、设置和所有上传图片。请先导出备份。",
       action: async () => {
         if (isCloudEnabled) {
           applyCloudState(await clearCloudAll());
@@ -616,13 +685,23 @@ export function App() {
 
   async function handleImportData(file: File) {
     if (!requireAdmin("settings")) return;
+    let payload: ExportPayload;
+    try {
+      payload = JSON.parse(await file.text()) as ExportPayload;
+      if (payload.version !== 1 && payload.version !== 2) {
+        throw new Error("不支持的备份版本。");
+      }
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "备份文件无法读取。", "danger");
+      return;
+    }
+    const productCount = Array.isArray(payload.products) ? payload.products.length : 0;
+    const imageCount = Array.isArray(payload.images) ? payload.images.length : 0;
     setConfirmAction({
       title: "导入并覆盖现有资料？",
-      body: "导入会覆盖当前商品、图片、设置和管理席资料。图片会先自动压缩到 30KB 内。",
+      body: `将导入 ${productCount} 个商品、${imageCount} 张图片，并覆盖当前商品、图片、设置和管理员资料。图片会先压缩到 30KB 内。`,
       action: async () => {
         try {
-          const text = await file.text();
-          const payload = JSON.parse(text) as ExportPayload;
           const importedState = await importPayload(payload);
           if (isCloudEnabled) {
             applyCloudState(importedState);
@@ -674,7 +753,7 @@ export function App() {
         onLogout={handleLogout}
         onCreate={() => {
           if (!requireAdmin("admin")) return;
-          setEditingProduct(makeNewProduct());
+          setEditingProduct(makeNewProduct(state.products.length));
         }}
       />
 
@@ -707,11 +786,13 @@ export function App() {
             <ProductAdmin
               products={state.products}
               isAuthed={isAuthed}
-              onCreate={() => setEditingProduct(makeNewProduct())}
+              onCreate={() => setEditingProduct(makeNewProduct(state.products.length))}
               onEdit={setEditingProduct}
               onToggleStatus={handleToggleStatus}
               onDelete={handleDeleteProduct}
               onBulkStatus={handleBulkStatus}
+              onBulkDelete={handleBulkDelete}
+              onDuplicate={handleDuplicateProduct}
             />
           </div>
         ) : null}
@@ -763,9 +844,10 @@ export function App() {
   );
 }
 
-function makeNewProduct(): Product {
+function makeNewProduct(sortOrder = 0): Product {
   return {
     ...blankProduct,
+    sortOrder,
     id: `product-${crypto.randomUUID()}`,
     updatedAt: new Date().toISOString(),
   };
@@ -842,7 +924,7 @@ function TopNav({
         <div className="cloud-status" aria-label={cloudEnabled ? "资料已同步" : "离线预览"}>
           <Cloud size={15} />
           <span>{cloudEnabled ? "资料已同步" : "离线预览"}</span>
-          <i>{isAuthed ? "管理席" : "游客模式"}</i>
+          <i>{isAuthed ? "管理员" : "游客模式"}</i>
         </div>
         {isAuthed ? (
           <button className="button secondary" type="button" onClick={onLogout}>
@@ -852,10 +934,10 @@ function TopNav({
         ) : (
           <button className="button secondary" type="button" onClick={onLogin}>
             <LogIn size={16} />
-            {hasAdmin ? "管理席登录" : "创建管理席"}
+            {hasAdmin ? "管理员登录" : "创建管理员"}
           </button>
         )}
-        {isAuthed ? (
+        {isAuthed && view === "admin" ? (
           <button className="button primary" type="button" onClick={onCreate}>
             <PackagePlus size={16} />
             新增商品
@@ -958,9 +1040,9 @@ function AuthScreen({
       <section className="auth-card">
         <div className="section-label">
           <Lock size={15} />
-          {adminUser ? "管理席登录" : "首次创建管理席"}
+          {adminUser ? "管理员登录" : "首次创建管理员"}
         </div>
-        <h1>{adminUser ? "登录管理席" : "创建管理席"}</h1>
+        <h1>{adminUser ? "登录管理员" : "创建管理员"}</h1>
         <p>
           登录后可整理商品档案、展示状态与品牌风格。游客可直接进入橱窗浏览。
         </p>
@@ -1007,7 +1089,7 @@ function AuthScreen({
           </label>
           {error ? <p className="field-error">{error}</p> : null}
           <button className="button primary wide" type="submit">
-            {adminUser ? "登录管理席" : "创建管理席"}
+            {adminUser ? "登录管理员" : "创建管理员"}
           </button>
           <button className="button ghost wide" type="button" onClick={onBrowse}>
             <Eye size={16} />
@@ -1050,21 +1132,40 @@ function Storefront({
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
   const [status, setStatus] = useState<"all" | ProductStatus>("all");
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const catalogProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      if (settings.defaultSort === "manual") return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      if (settings.defaultSort === "name") return a.name.localeCompare(b.name, "zh-Hans-CN");
+      if (settings.defaultSort === "price") return Number(a.price) - Number(b.price);
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [products, settings.defaultSort]);
 
   const categories = useMemo(
-    () => ["全部", ...Array.from(new Set(products.map((item) => item.category)))],
-    [products],
+    () => ["全部", ...Array.from(new Set(catalogProducts.map((item) => item.category)))],
+    [catalogProducts],
   );
   const liveCount = products.filter((item) => item.status === "live").length;
   const draftCount = products.length - liveCount;
   const selectedProduct =
-    products.find((product) => product.id === selectedProductId) ?? products[0];
+    catalogProducts.find((product) => product.id === selectedProductId) ??
+    catalogProducts[0];
 
   const filteredProducts = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    return products.filter((product) => {
+    return catalogProducts.filter((product) => {
       const matchesQuery = normalizedQuery
-        ? [product.name, product.subtitle, product.category, product.description]
+        ? [
+            product.name,
+            product.subtitle,
+            product.category,
+            product.description,
+            product.origin,
+            product.flavorNotes,
+            ...(product.tags ?? []),
+          ]
             .join(" ")
             .toLowerCase()
             .includes(normalizedQuery)
@@ -1074,10 +1175,21 @@ function Storefront({
       const matchesStatus = status === "all" ? true : product.status === status;
       return matchesQuery && matchesCategory && matchesStatus;
     });
-  }, [category, products, query, status]);
+  }, [catalogProducts, category, query, status]);
+
+  function resetFilters() {
+    setQuery("");
+    setCategory("全部");
+    setStatus("all");
+  }
+
+  function selectProduct(productId: string) {
+    onSelectProduct(productId);
+    setDetailOpen(true);
+  }
 
   return (
-    <main className={`storefront density-${settings.gridDensity}`}>
+    <main className={`storefront density-${settings.gridDensity} hero-${settings.heroLayout}`}>
       <section className="store-hero">
         <div className="hero-copy">
           <div className="section-label">
@@ -1090,7 +1202,7 @@ function Storefront({
             <button
               className="button primary"
               type="button"
-              onClick={() => selectedProduct && onSelectProduct(selectedProduct.id)}
+              onClick={() => selectedProduct && selectProduct(selectedProduct.id)}
             >
               查看精选
               <ChevronRight size={16} />
@@ -1192,7 +1304,7 @@ function Storefront({
                 product={product}
                 settings={settings}
                 selected={selectedProduct?.id === product.id}
-                onSelect={() => onSelectProduct(product.id)}
+                onSelect={() => selectProduct(product.id)}
               />
             ))
           ) : (
@@ -1200,12 +1312,16 @@ function Storefront({
               icon={<Filter size={26} />}
               title="没有符合条件的商品"
               body="换个关键词或分类看看。"
+              actionLabel="恢复全部商品"
+              onAction={resetFilters}
             />
           )}
         </div>
         <ProductDetail
           product={selectedProduct}
           settings={settings}
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
         />
       </section>
     </main>
@@ -1226,7 +1342,10 @@ function ProductCard({
   return (
     <article className={`product-card ${selected ? "selected" : ""}`}>
       <button className="product-media-button" type="button" onClick={onSelect}>
-        <ImageFrame imageId={product.coverImageId} alt={product.name} />
+        <ImageFrame
+          imageId={product.coverImageId}
+          alt={product.imageMeta?.[product.coverImageId ?? ""]?.alt || product.name}
+        />
       </button>
       <div className="product-card-body">
         <StatusBadge status={product.status} />
@@ -1239,6 +1358,21 @@ function ProductCard({
           <span>{product.specs}</span>
           {settings.showStock ? <span>库存 {product.stock}</span> : null}
         </div>
+        {(settings.showOrigin && product.origin) ||
+        (settings.showFlavorNotes && product.flavorNotes) ? (
+          <p className="product-notes">
+            {[settings.showOrigin ? product.origin : "", settings.showFlavorNotes ? product.flavorNotes : ""]
+              .filter(Boolean)
+              .join(" / ")}
+          </p>
+        ) : null}
+        {product.tags?.length ? (
+          <div className="tag-row">
+            {product.tags.slice(0, 3).map((tag, index) => (
+              <span key={`${tag}-${index}`}>{tag}</span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -1247,13 +1381,17 @@ function ProductCard({
 function ProductDetail({
   product,
   settings,
+  open,
+  onClose,
 }: {
   product?: Product;
   settings: SiteSettings;
+  open: boolean;
+  onClose: () => void;
 }) {
   if (!product) {
     return (
-      <aside className="detail-panel">
+      <aside className={`detail-panel ${open ? "open" : ""}`}>
         <EmptyState
           icon={<ImageIcon size={24} />}
           title="暂无商品详情"
@@ -1264,10 +1402,13 @@ function ProductDetail({
   }
 
   return (
-    <aside className="detail-panel">
+    <aside className={`detail-panel ${open ? "open" : ""}`}>
       <div className="detail-header">
         <span>当前选中</span>
         <StatusBadge status={product.status} />
+        <button className="icon-button mobile-only" type="button" onClick={onClose} aria-label="关闭详情">
+          <X size={16} />
+        </button>
       </div>
       <ImageFrame imageId={product.coverImageId} alt={product.name} size="detail" />
       <h2>{product.name}</h2>
@@ -1277,6 +1418,18 @@ function ProductDetail({
           <dt>分类</dt>
           <dd>{product.category}</dd>
         </div>
+        {settings.showOrigin && product.origin ? (
+          <div>
+            <dt>产地</dt>
+            <dd>{product.origin}</dd>
+          </div>
+        ) : null}
+        {settings.showFlavorNotes && product.flavorNotes ? (
+          <div>
+            <dt>风味</dt>
+            <dd>{product.flavorNotes}</dd>
+          </div>
+        ) : null}
         {settings.showPrice ? (
           <div>
             <dt>价格</dt>
@@ -1294,6 +1447,13 @@ function ProductDetail({
           </div>
         ) : null}
       </dl>
+      {product.tags?.length ? (
+        <div className="tag-row">
+          {product.tags.map((tag, index) => (
+            <span key={`${tag}-${index}`}>{tag}</span>
+          ))}
+        </div>
+      ) : null}
     </aside>
   );
 }
@@ -1306,6 +1466,8 @@ function ProductAdmin({
   onToggleStatus,
   onDelete,
   onBulkStatus,
+  onBulkDelete,
+  onDuplicate,
 }: {
   products: Product[];
   isAuthed: boolean;
@@ -1313,10 +1475,83 @@ function ProductAdmin({
   onEdit: (product: Product) => void;
   onToggleStatus: (id: string) => void;
   onDelete: (product: Product) => void;
-  onBulkStatus: (status: ProductStatus) => void | Promise<void>;
+  onBulkStatus: (status: ProductStatus, productIds?: string[]) => void | Promise<void>;
+  onBulkDelete: (productIds: string[]) => void | Promise<void>;
+  onDuplicate: (product: Product) => void | Promise<void>;
 }) {
   const liveCount = products.filter((product) => product.status === "live").length;
   const missingImageCount = products.filter((product) => !product.coverImageId).length;
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("全部");
+  const [status, setStatus] = useState<"all" | ProductStatus>("all");
+  const [imageFilter, setImageFilter] = useState<"all" | "missing" | "ready">("all");
+  const [sortBy, setSortBy] = useState<ProductSort | "stock">("updated");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const categories = useMemo(
+    () => ["全部", ...Array.from(new Set(products.map((product) => product.category).filter(Boolean)))],
+    [products],
+  );
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const matches = products.filter((product) => {
+      const searchText = [
+        product.name,
+        product.subtitle,
+        product.category,
+        product.description,
+        product.origin,
+        product.flavorNotes,
+        ...(product.tags ?? []),
+      ]
+        .join(" ")
+        .toLowerCase();
+      const matchesQuery = normalizedQuery ? searchText.includes(normalizedQuery) : true;
+      const matchesCategory = category === "全部" ? true : product.category === category;
+      const matchesStatus = status === "all" ? true : product.status === status;
+      const matchesImages =
+        imageFilter === "all"
+          ? true
+          : imageFilter === "missing"
+            ? !product.coverImageId
+            : Boolean(product.coverImageId);
+      return matchesQuery && matchesCategory && matchesStatus && matchesImages;
+    });
+
+    return [...matches].sort((a, b) => {
+      if (sortBy === "manual") return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      if (sortBy === "name") return a.name.localeCompare(b.name, "zh-Hans-CN");
+      if (sortBy === "price") return Number(a.price) - Number(b.price);
+      if (sortBy === "stock") return Number(a.stock) - Number(b.stock);
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [category, imageFilter, products, query, sortBy, status]);
+  const visibleIds = filteredProducts.map((product) => product.id);
+  const selectedVisibleIds = selectedIds.filter((id) => visibleIds.includes(id));
+  const bulkIds = selectedVisibleIds.length ? selectedVisibleIds : visibleIds;
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+
+  useEffect(() => {
+    setSelectedIds((current) =>
+      current.filter((id) => products.some((product) => product.id === id)),
+    );
+  }, [products]);
+
+  function toggleSelected(productId: string) {
+    setSelectedIds((current) =>
+      current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId],
+    );
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds((current) =>
+      allVisibleSelected
+        ? current.filter((id) => !visibleIds.includes(id))
+        : Array.from(new Set([...current, ...visibleIds])),
+    );
+  }
 
   if (!isAuthed) {
     return (
@@ -1324,7 +1559,7 @@ function ProductAdmin({
         <EmptyState
           icon={<Lock size={28} />}
           title="需要管理员权限"
-          body="请先登录管理席。"
+          body="请先登录管理员。"
         />
       </main>
     );
@@ -1351,22 +1586,76 @@ function ProductAdmin({
         <StatCard label="在售" value={String(liveCount)} />
         <StatCard label="待补图" value={String(missingImageCount)} />
       </section>
+      <section className="admin-filterbar">
+        <div className="search-box">
+          <Search size={16} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="搜索商品、分类、说明、标签"
+          />
+        </div>
+        <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          {categories.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+        <select
+          value={status}
+          onChange={(event) => setStatus(event.target.value as "all" | ProductStatus)}
+        >
+          <option value="all">全部状态</option>
+          <option value="live">已上架</option>
+          <option value="draft">未上架</option>
+        </select>
+        <select
+          value={imageFilter}
+          onChange={(event) => setImageFilter(event.target.value as "all" | "missing" | "ready")}
+        >
+          <option value="all">全部图片</option>
+          <option value="ready">有封面</option>
+          <option value="missing">缺少封面</option>
+        </select>
+        <select
+          value={sortBy}
+          onChange={(event) => setSortBy(event.target.value as ProductSort | "stock")}
+        >
+          <option value="updated">最近更新</option>
+          <option value="manual">手动顺序</option>
+          <option value="name">名称</option>
+          <option value="price">价格</option>
+          <option value="stock">库存</option>
+        </select>
+      </section>
       <section className="admin-toolbar">
         <div className="section-label">
           <SlidersHorizontal size={15} />
           展示状态
         </div>
         <div>
-          <button className="button secondary" type="button" onClick={() => onBulkStatus("live")}>
+          <button className="button secondary" type="button" onClick={() => onBulkStatus("live", bulkIds)}>
             批量上架
           </button>
-          <button className="button secondary" type="button" onClick={() => onBulkStatus("draft")}>
+          <button className="button secondary" type="button" onClick={() => onBulkStatus("draft", bulkIds)}>
             批量下架
+          </button>
+          <button className="button danger ghost" type="button" onClick={() => onBulkDelete(bulkIds)}>
+            批量删除
           </button>
         </div>
       </section>
       <section className="product-table">
         <div className="table-head">
+          <label className="check-cell" aria-label="选择当前筛选结果">
+            <input
+              type="checkbox"
+              checked={allVisibleSelected}
+              disabled={!visibleIds.length}
+              onChange={toggleAllVisible}
+            />
+          </label>
           <span>商品</span>
           <span>分类</span>
           <span>价格</span>
@@ -1374,8 +1663,18 @@ function ProductAdmin({
           <span>状态</span>
           <span>操作</span>
         </div>
-        {products.map((product) => (
-          <article key={product.id} className="table-row">
+        {filteredProducts.map((product) => (
+          <article
+            key={product.id}
+            className={`table-row ${selectedIds.includes(product.id) ? "selected" : ""}`}
+          >
+            <label className="check-cell" aria-label={`选择 ${product.name}`}>
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(product.id)}
+                onChange={() => toggleSelected(product.id)}
+              />
+            </label>
             <div className="table-product">
               <ImageFrame imageId={product.coverImageId} alt={product.name} size="thumb" />
               <div>
@@ -1401,6 +1700,14 @@ function ProductAdmin({
                 {product.status === "live" ? <EyeOff size={16} /> : <Eye size={16} />}
                 {product.status === "live" ? "下架" : "上架"}
               </button>
+              <button
+                className="icon-button"
+                type="button"
+                aria-label="复制商品"
+                onClick={() => onDuplicate(product)}
+              >
+                <Copy size={16} />
+              </button>
               <button className="icon-button" type="button" aria-label="编辑商品" onClick={() => onEdit(product)}>
                 <Pencil size={16} />
               </button>
@@ -1410,6 +1717,13 @@ function ProductAdmin({
             </div>
           </article>
         ))}
+        {!filteredProducts.length ? (
+          <EmptyState
+            icon={<Filter size={24} />}
+            title="没有符合条件的商品"
+            body="清空搜索或切换筛选条件后再查看。"
+          />
+        ) : null}
       </section>
     </main>
   );
@@ -1428,13 +1742,44 @@ function ProductEditor({
 }) {
   const [draft, setDraft] = useState<Product>(product);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [validationError, setValidationError] = useState("");
   const [uploadReports, setUploadReports] = useState<UploadReport[]>([]);
+  const baseline = useMemo(() => JSON.stringify(product), [product]);
+  const isDirty = useMemo(() => JSON.stringify(draft) !== baseline, [baseline, draft]);
 
   function update<K extends keyof Product>(key: K, value: Product[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleFiles(files: FileList | null) {
+  function requestClose() {
+    if (isDirty || uploadReports.length) {
+      setShowCloseConfirm(true);
+      return;
+    }
+    onClose();
+  }
+
+  function updateImageMeta(
+    imageId: string,
+    key: "alt" | "note",
+    value: string,
+  ) {
+    setDraft((current) => ({
+      ...current,
+      imageMeta: {
+        ...(current.imageMeta ?? {}),
+        [imageId]: {
+          ...(current.imageMeta?.[imageId] ?? {}),
+          [key]: value,
+        },
+      },
+    }));
+  }
+
+  async function handleFiles(files: FileList | File[] | null) {
     if (!files?.length) return;
     setIsUploading(true);
     try {
@@ -1469,8 +1814,15 @@ function ProductEditor({
     } catch (error) {
       onToast(error instanceof Error ? error.message : "图片上传失败。", "danger");
     } finally {
+      setIsDragging(false);
       setIsUploading(false);
     }
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    void handleFiles(Array.from(event.dataTransfer.files));
   }
 
   async function handleRemoveImage(imageId: string) {
@@ -1482,24 +1834,47 @@ function ProductEditor({
         imageIds,
         coverImageId:
           current.coverImageId === imageId ? imageIds[0] : current.coverImageId,
+        imageMeta: Object.fromEntries(
+          Object.entries(current.imageMeta ?? {}).filter(([id]) => id !== imageId),
+        ),
       };
     });
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    setValidationError("");
     if (!draft.name.trim()) {
+      setValidationError("请输入商品名称。");
       onToast("请输入商品名称。", "danger");
       return;
     }
-    await onSave({
-      ...draft,
-      name: draft.name.trim(),
-      subtitle: draft.subtitle.trim(),
-      category: draft.category.trim() || "未分类",
-      specs: draft.specs.trim() || "20 支 / 包",
-      description: draft.description.trim(),
-    });
+    if (!Number.isFinite(Number(draft.price)) || Number(draft.price) < 0) {
+      setValidationError("价格不能为负数。");
+      return;
+    }
+    if (!Number.isFinite(Number(draft.stock)) || Number(draft.stock) < 0) {
+      setValidationError("库存不能为负数。");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onSave({
+        ...draft,
+        name: draft.name.trim(),
+        subtitle: draft.subtitle.trim(),
+        category: draft.category.trim() || "未分类",
+        specs: draft.specs.trim() || "20 支 / 包",
+        description: draft.description.trim(),
+        origin: draft.origin?.trim() ?? "",
+        flavorNotes: draft.flavorNotes?.trim() ?? "",
+        tags: (draft.tags ?? []).map((tag) => tag.trim()).filter(Boolean),
+        price: Number(draft.price),
+        stock: Number(draft.stock),
+      });
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -1513,13 +1888,21 @@ function ProductEditor({
               <StatusBadge status={draft.status} />
             </div>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="关闭">
+          <button className="icon-button" type="button" onClick={requestClose} aria-label="关闭">
             <X size={18} />
           </button>
         </div>
         <form className="editor-form" onSubmit={handleSubmit}>
           <div className="image-uploader">
-            <div className="image-uploader-main">
+            <div
+              className={`image-uploader-main ${isDragging ? "dragging" : ""}`}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+            >
               <ImageFrame imageId={draft.coverImageId} alt={draft.name || "商品图"} size="editor" />
               <label className="upload-button">
                 <Upload size={16} />
@@ -1566,17 +1949,36 @@ function ProductEditor({
               )}
             </div>
             {draft.imageIds.length ? (
-              <div className="image-strip">
-                {draft.imageIds.map((imageId) => (
-                  <ImageThumb
-                    key={imageId}
-                    imageId={imageId}
-                    selected={draft.coverImageId === imageId}
-                    onCover={() => update("coverImageId", imageId)}
-                    onRemove={() => handleRemoveImage(imageId)}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="image-strip">
+                  {draft.imageIds.map((imageId) => (
+                    <ImageThumb
+                      key={imageId}
+                      imageId={imageId}
+                      selected={draft.coverImageId === imageId}
+                      onCover={() => update("coverImageId", imageId)}
+                      onRemove={() => handleRemoveImage(imageId)}
+                    />
+                  ))}
+                </div>
+                <div className="image-meta-list">
+                  {draft.imageIds.map((imageId, index) => (
+                    <div key={imageId} className="image-meta-row">
+                      <span>图片 {index + 1}</span>
+                      <input
+                        value={draft.imageMeta?.[imageId]?.alt ?? ""}
+                        onChange={(event) => updateImageMeta(imageId, "alt", event.target.value)}
+                        placeholder="图片说明"
+                      />
+                      <input
+                        value={draft.imageMeta?.[imageId]?.note ?? ""}
+                        onChange={(event) => updateImageMeta(imageId, "note", event.target.value)}
+                        placeholder="内部备注"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <p className="helper-text">建议上传明亮棚拍图，页面会自动裁切为统一比例。</p>
             )}
@@ -1605,6 +2007,47 @@ function ProductEditor({
                 value={draft.category}
                 onChange={(event) => update("category", event.target.value)}
                 placeholder="经典 / 礼盒 / 限量"
+              />
+            </label>
+            <label>
+              <span>产地</span>
+              <input
+                value={draft.origin ?? ""}
+                onChange={(event) => update("origin", event.target.value)}
+                placeholder="例如：云南 / 浙江 / 海外"
+              />
+            </label>
+            <label>
+              <span>风味</span>
+              <input
+                value={draft.flavorNotes ?? ""}
+                onChange={(event) => update("flavorNotes", event.target.value)}
+                placeholder="例如：清雅、木质、微甜"
+              />
+            </label>
+            <label>
+              <span>标签</span>
+              <input
+                value={(draft.tags ?? []).join("，")}
+                onChange={(event) =>
+                  update(
+                    "tags",
+                    event.target.value
+                      .split(/[，,]/)
+                      .map((tag) => tag.trim())
+                      .filter(Boolean),
+                  )
+                }
+                placeholder="新品，礼盒，柔和"
+              />
+            </label>
+            <label>
+              <span>排序</span>
+              <input
+                value={draft.sortOrder ?? 0}
+                type="number"
+                min={0}
+                onChange={(event) => update("sortOrder", Number(event.target.value))}
               />
             </label>
             <label>
@@ -1650,16 +2093,28 @@ function ProductEditor({
               placeholder="填写展示页中可见的产品说明"
             />
           </label>
+          {validationError ? <p className="form-error">{validationError}</p> : null}
           <div className="drawer-actions">
-            <button className="button secondary" type="button" onClick={onClose}>
+            <button className="button secondary" type="button" onClick={requestClose}>
               取消
             </button>
-            <button className="button primary" type="submit">
-              保存商品
+            <button className="button primary" type="submit" disabled={isSaving || isUploading}>
+              {isSaving ? "保存中..." : "保存商品"}
             </button>
           </div>
         </form>
       </aside>
+      {showCloseConfirm ? (
+        <ConfirmDialog
+          title="放弃未保存修改？"
+          body="当前商品信息还没有保存，关闭后本次修改不会保留。"
+          onCancel={() => setShowCloseConfirm(false)}
+          onConfirm={() => {
+            setShowCloseConfirm(false);
+            onClose();
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1696,6 +2151,7 @@ function SettingsPanel({
   });
   const [adminDirty, setAdminDirty] = useState(false);
   const [adminError, setAdminError] = useState("");
+  const [confirmDefault, setConfirmDefault] = useState(false);
 
   useEffect(() => {
     if (!isDirty) {
@@ -1726,8 +2182,13 @@ function SettingsPanel({
   }
 
   function restoreDefaultSettings() {
+    setConfirmDefault(true);
+  }
+
+  function applyDefaultSettings() {
     setDraft(defaultSettings);
     setIsDirty(true);
+    setConfirmDefault(false);
   }
 
   function updateAdminDraft(
@@ -1792,7 +2253,7 @@ function SettingsPanel({
         <EmptyState
           icon={<Lock size={28} />}
           title="需要管理员权限"
-          body="请先登录管理席。"
+          body="请先登录管理员。"
         />
       </main>
     );
@@ -1958,6 +2419,16 @@ function SettingsPanel({
               ))}
             </div>
           </div>
+          <div className={`settings-preview theme-${draft.accentTheme} font-${draft.fontPreset}`}>
+            <span>橱窗预览</span>
+            <strong>{draft.heroTitle || "精选陈列"}</strong>
+            <p>{draft.heroBody || "品牌介绍会在这里呈现。"}</p>
+            <div className="product-facts">
+              {draft.showPrice ? <span>¥ 58</span> : null}
+              <span>20 支 / 包</span>
+              {draft.showStock ? <span>库存 84</span> : null}
+            </div>
+          </div>
           <label>
             <span>商品密度</span>
             <select
@@ -1970,6 +2441,31 @@ function SettingsPanel({
               <option value="compact">紧凑</option>
             </select>
           </label>
+          <label>
+            <span>首屏布局</span>
+            <select
+              value={draft.heroLayout}
+              onChange={(event) =>
+                update("heroLayout", event.target.value as SiteSettings["heroLayout"])
+              }
+            >
+              <option value="editorial">编辑精选</option>
+              <option value="catalog">目录陈列</option>
+              <option value="minimal">留白橱窗</option>
+            </select>
+          </label>
+          <label>
+            <span>默认排序</span>
+            <select
+              value={draft.defaultSort}
+              onChange={(event) => update("defaultSort", event.target.value as ProductSort)}
+            >
+              <option value="manual">手动顺序</option>
+              <option value="updated">最近更新</option>
+              <option value="name">名称</option>
+              <option value="price">价格</option>
+            </select>
+          </label>
           <Toggle
             checked={draft.showPrice}
             label="展示价格"
@@ -1979,6 +2475,16 @@ function SettingsPanel({
             checked={draft.showStock}
             label="展示库存"
             onChange={(value) => update("showStock", value)}
+          />
+          <Toggle
+            checked={draft.showOrigin}
+            label="显示产地"
+            onChange={(value) => update("showOrigin", value)}
+          />
+          <Toggle
+            checked={draft.showFlavorNotes}
+            label="显示风味"
+            onChange={(value) => update("showFlavorNotes", value)}
           />
           <Toggle
             checked={draft.requireAgeGate}
@@ -2036,6 +2542,14 @@ function SettingsPanel({
           </button>
         </section>
       </section>
+      {confirmDefault ? (
+        <ConfirmDialog
+          title="恢复默认展示？"
+          body="品牌文案、主题、字体和展示字段会回到默认方案，保存后才会同步到网页。"
+          onCancel={() => setConfirmDefault(false)}
+          onConfirm={applyDefaultSettings}
+        />
+      ) : null}
     </main>
   );
 }
@@ -2129,16 +2643,25 @@ function EmptyState({
   icon,
   title,
   body,
+  actionLabel,
+  onAction,
 }: {
   icon: ReactNode;
   title: string;
   body: string;
+  actionLabel?: string;
+  onAction?: () => void;
 }) {
   return (
     <div className="empty-state">
       <div>{icon}</div>
       <h2>{title}</h2>
       <p>{body}</p>
+      {actionLabel && onAction ? (
+        <button className="button secondary" type="button" onClick={onAction}>
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   );
 }
