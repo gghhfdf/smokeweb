@@ -60,7 +60,7 @@ function writeJson<T>(key: string, value: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (error) {
-    console.error("本地存储写入失败", error);
+    console.error("Storage write failed", error);
   }
 }
 
