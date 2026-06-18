@@ -1720,10 +1720,14 @@ function SettingsPanel({
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function handleSaveSettings() {
     await onSave(draft);
     setIsDirty(false);
+  }
+
+  function restoreDefaultSettings() {
+    setDraft(defaultSettings);
+    setIsDirty(true);
   }
 
   function updateAdminDraft(
@@ -1804,34 +1808,110 @@ function SettingsPanel({
         <h1>品牌橱窗设置</h1>
         <p>调整首页文案、陈列风格、字体主题与资料备份。</p>
       </section>
-      <form className="settings-grid" onSubmit={handleSubmit}>
-        <section className="settings-card">
-          <h2>品牌展示</h2>
-          <label>
-            <span>品牌名称</span>
-            <input
-              value={draft.brandName}
-              onChange={(event) => update("brandName", event.target.value)}
-            />
-          </label>
-          <label>
-            <span>首页标题</span>
-            <input
-              value={draft.heroTitle}
-              onChange={(event) => update("heroTitle", event.target.value)}
-            />
-          </label>
-          <label>
-            <span>首页说明</span>
-            <textarea
-              value={draft.heroBody}
-              onChange={(event) => update("heroBody", event.target.value)}
-              rows={4}
-            />
-          </label>
-        </section>
-        <section className="settings-card">
-          <h2>显示偏好</h2>
+      <section className="settings-grid">
+        <div className="settings-column settings-primary-column">
+          <section className="settings-card brand-settings-card">
+            <h2>品牌展示</h2>
+            <label>
+              <span>品牌名称</span>
+              <input
+                value={draft.brandName}
+                onChange={(event) => update("brandName", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>首页标题</span>
+              <input
+                value={draft.heroTitle}
+                onChange={(event) => update("heroTitle", event.target.value)}
+              />
+            </label>
+            <label>
+              <span>首页说明</span>
+              <textarea
+                value={draft.heroBody}
+                onChange={(event) => update("heroBody", event.target.value)}
+                rows={4}
+              />
+            </label>
+          </section>
+          {adminUser ? (
+            <form className="settings-card admin-account-card" onSubmit={handleAdminSubmit}>
+              <div>
+                <h2>管理员账号</h2>
+                <p className="settings-note">
+                  修改用户名或密码前，需要输入当前密码确认身份。
+                </p>
+              </div>
+              <div className="form-grid admin-account-grid">
+                <label>
+                  <span>显示名称</span>
+                  <input
+                    value={adminDraft.displayName}
+                    onChange={(event) =>
+                      updateAdminDraft("displayName", event.target.value)
+                    }
+                    placeholder="陈列管理员"
+                  />
+                </label>
+                <label>
+                  <span>管理员用户名</span>
+                  <input
+                    value={adminDraft.username}
+                    onChange={(event) =>
+                      updateAdminDraft("username", event.target.value)
+                    }
+                    autoComplete="username"
+                  />
+                </label>
+                <label>
+                  <span>当前密码</span>
+                  <input
+                    type="password"
+                    value={adminDraft.currentPassword}
+                    onChange={(event) =>
+                      updateAdminDraft("currentPassword", event.target.value)
+                    }
+                    autoComplete="current-password"
+                  />
+                </label>
+                <label>
+                  <span>新密码</span>
+                  <input
+                    type="password"
+                    value={adminDraft.newPassword}
+                    onChange={(event) =>
+                      updateAdminDraft("newPassword", event.target.value)
+                    }
+                    autoComplete="new-password"
+                    placeholder="留空则不修改"
+                  />
+                </label>
+                <label>
+                  <span>确认新密码</span>
+                  <input
+                    type="password"
+                    value={adminDraft.confirmPassword}
+                    onChange={(event) =>
+                      updateAdminDraft("confirmPassword", event.target.value)
+                    }
+                    autoComplete="new-password"
+                    placeholder="再次输入新密码"
+                  />
+                </label>
+              </div>
+              {adminError ? <p className="field-error">{adminError}</p> : null}
+              <div className="admin-account-actions">
+                <button className="button primary" type="submit">
+                  保存管理员账号
+                </button>
+              </div>
+            </form>
+          ) : null}
+        </div>
+        <div className="settings-column settings-display-column">
+          <section className="settings-card display-settings-card">
+            <h2>显示偏好</h2>
           <div className="setting-group">
             <span className="field-label">主题风格</span>
             <div className="choice-grid theme-choice-grid">
@@ -1905,8 +1985,17 @@ function SettingsPanel({
             label="进入前年龄确认"
             onChange={(value) => update("requireAgeGate", value)}
           />
-        </section>
-        <section className="settings-card danger-zone">
+          </section>
+          <div className="settings-actions">
+            <button className="button secondary" type="button" onClick={restoreDefaultSettings}>
+              恢复默认展示
+            </button>
+            <button className="button primary" type="button" onClick={handleSaveSettings}>
+              保存设置
+            </button>
+          </div>
+        </div>
+        <section className="settings-card backup-settings-card danger-zone">
           <h2>资料备份</h2>
           <p className="settings-note">
             {isCloudEnabled
@@ -1946,88 +2035,7 @@ function SettingsPanel({
             清空全部资料
           </button>
         </section>
-        <div className="settings-actions">
-          <button className="button secondary" type="button" onClick={() => setDraft(defaultSettings)}>
-            恢复默认展示
-          </button>
-          <button className="button primary" type="submit">
-            保存设置
-          </button>
-        </div>
-      </form>
-      {adminUser ? (
-        <form className="settings-card admin-account-card" onSubmit={handleAdminSubmit}>
-          <div>
-            <h2>管理员账号</h2>
-            <p className="settings-note">
-              修改用户名或密码前，需要输入当前密码确认身份。
-            </p>
-          </div>
-          <div className="form-grid admin-account-grid">
-            <label>
-              <span>显示名称</span>
-              <input
-                value={adminDraft.displayName}
-                onChange={(event) =>
-                  updateAdminDraft("displayName", event.target.value)
-                }
-                placeholder="陈列管理员"
-              />
-            </label>
-            <label>
-              <span>管理员用户名</span>
-              <input
-                value={adminDraft.username}
-                onChange={(event) =>
-                  updateAdminDraft("username", event.target.value)
-                }
-                autoComplete="username"
-              />
-            </label>
-            <label>
-              <span>当前密码</span>
-              <input
-                type="password"
-                value={adminDraft.currentPassword}
-                onChange={(event) =>
-                  updateAdminDraft("currentPassword", event.target.value)
-                }
-                autoComplete="current-password"
-              />
-            </label>
-            <label>
-              <span>新密码</span>
-              <input
-                type="password"
-                value={adminDraft.newPassword}
-                onChange={(event) =>
-                  updateAdminDraft("newPassword", event.target.value)
-                }
-                autoComplete="new-password"
-                placeholder="留空则不修改"
-              />
-            </label>
-            <label>
-              <span>确认新密码</span>
-              <input
-                type="password"
-                value={adminDraft.confirmPassword}
-                onChange={(event) =>
-                  updateAdminDraft("confirmPassword", event.target.value)
-                }
-                autoComplete="new-password"
-                placeholder="再次输入新密码"
-              />
-            </label>
-          </div>
-          {adminError ? <p className="field-error">{adminError}</p> : null}
-          <div className="admin-account-actions">
-            <button className="button primary" type="submit">
-              保存管理员账号
-            </button>
-          </div>
-        </form>
-      ) : null}
+      </section>
     </main>
   );
 }

@@ -39,6 +39,9 @@
   --motion-fast: 140ms;
   --motion-standard: 220ms;
   --motion-slow: 320ms;
+  --page-max: 1500px;
+  --page-top: 28px;
+  --page-gap: 20px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.2, 0.9, 0.2, 1.12);
   --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
@@ -294,7 +297,7 @@ select:focus-visible {
 
 .app-shell {
   min-height: 100vh;
-  padding: 28px 38px 42px;
+  padding: 24px 34px 38px;
   background:
     linear-gradient(180deg, var(--canvas-wash-start), var(--canvas-wash-end)),
     repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 74px),
@@ -309,7 +312,7 @@ select:focus-visible {
   align-items: center;
   gap: 24px;
   min-height: 58px;
-  padding: 8px 0 18px;
+  padding: 6px 0 14px;
   background: linear-gradient(180deg, var(--nav-wash-start), var(--nav-wash-end) 80%, transparent);
   backdrop-filter: blur(18px);
 }
@@ -687,10 +690,10 @@ select:focus-visible {
 
 .auth-screen {
   display: grid;
-  grid-template-columns: minmax(340px, 420px) minmax(500px, 1fr);
-  gap: 28px;
-  max-width: 1200px;
-  margin: 82px auto 0;
+  grid-template-columns: minmax(340px, 440px) minmax(460px, 1fr);
+  gap: var(--page-gap);
+  max-width: 1180px;
+  margin: var(--page-top) auto 0;
 }
 
 .auth-card {
@@ -727,7 +730,7 @@ select:focus-visible {
 }
 
 .auth-form {
-  margin-top: 32px;
+  margin-top: 24px;
 }
 
 label {
@@ -815,8 +818,8 @@ textarea {
   grid-template-columns: 120px 1fr;
   align-items: center;
   gap: 28px;
-  min-height: 430px;
-  padding: 40px;
+  min-height: 360px;
+  padding: 34px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0 54%, rgba(222, 217, 203, 0.55) 54%),
     repeating-linear-gradient(90deg, rgba(120, 104, 74, 0.06) 0 1px, transparent 1px 32px),
@@ -844,19 +847,22 @@ textarea {
 .admin-page,
 .settings-page,
 .page-panel {
-  max-width: 1440px;
-  margin: 42px auto 0;
+  max-width: var(--page-max);
+  margin: var(--page-top) auto 0;
 }
 
 .store-hero {
   display: grid;
-  grid-template-columns: minmax(320px, 0.72fr) minmax(480px, 1fr) 190px;
-  gap: 26px;
+  grid-template-columns: minmax(320px, 0.68fr) minmax(480px, 1fr) 178px;
+  gap: var(--page-gap);
   align-items: stretch;
 }
 
 .hero-copy {
-  padding: 44px 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 36px 32px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background:
@@ -873,7 +879,7 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 32px;
+  margin-top: 26px;
 }
 
 .showcase-panel {
@@ -889,8 +895,8 @@ textarea {
   grid-template-columns: minmax(170px, 230px) 1fr;
   gap: 30px;
   align-items: center;
-  min-height: 360px;
-  padding: 28px 22px;
+  min-height: 300px;
+  padding: 24px 20px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0 54%, rgba(222, 217, 203, 0.55) 54%),
     repeating-linear-gradient(90deg, rgba(120, 104, 74, 0.06) 0 1px, transparent 1px 32px),
@@ -929,13 +935,13 @@ textarea {
 
 .hero-stats {
   display: grid;
-  gap: 14px;
-  padding: 18px;
+  gap: 12px;
+  padding: 16px;
 }
 
 .stat-card {
-  min-height: 104px;
-  padding: 18px;
+  min-height: 92px;
+  padding: 16px;
 }
 
 .stat-card span {
@@ -945,9 +951,9 @@ textarea {
 
 .stat-card strong {
   display: block;
-  margin-top: 12px;
+  margin-top: 10px;
   font-family: var(--font-display);
-  font-size: 42px;
+  font-size: 38px;
   font-weight: 500;
 }
 
@@ -956,7 +962,7 @@ textarea {
   grid-template-columns: minmax(260px, 1fr) auto auto;
   gap: 16px;
   align-items: center;
-  margin-top: 26px;
+  margin-top: var(--page-gap);
   padding: 16px;
 }
 
@@ -1019,8 +1025,8 @@ textarea {
 .store-grid-wrap {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 22px;
-  margin-top: 22px;
+  gap: var(--page-gap);
+  margin-top: var(--page-gap);
   padding: 18px;
 }
 
@@ -1219,7 +1225,7 @@ textarea {
 
 .admin-page {
   display: grid;
-  gap: 18px;
+  gap: var(--page-gap);
 }
 
 .admin-intro {
@@ -1227,7 +1233,7 @@ textarea {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 24px;
-  padding: 28px;
+  padding: 24px;
 }
 
 .admin-intro > .button {
@@ -1237,13 +1243,13 @@ textarea {
 
 .admin-intro h1,
 .settings-intro h1 {
-  font-size: 46px;
+  font-size: clamp(36px, 3vw, 46px);
 }
 
 .admin-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: var(--page-gap);
 }
 
 .admin-toolbar {
@@ -1356,22 +1362,55 @@ textarea {
 
 .settings-page {
   display: grid;
-  gap: 22px;
+  gap: 18px;
+  align-content: start;
 }
 
 .settings-intro {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 8px;
   max-width: 760px;
+  padding: 2px 2px 8px;
+}
+
+.settings-intro .section-label {
+  margin-bottom: 2px;
+}
+
+.settings-intro h1 {
+  margin-top: 12px;
+  margin-bottom: 10px;
+}
+
+.settings-intro p {
+  margin: 0;
 }
 
 .settings-grid {
-  grid-template-columns: minmax(320px, 1fr) minmax(280px, 0.8fr) minmax(260px, 0.65fr);
+  display: grid;
+  grid-template-columns: minmax(360px, 0.96fr) minmax(420px, 1.05fr) minmax(300px, 0.66fr);
+  gap: var(--page-gap);
   align-items: start;
+}
+
+.settings-column {
+  display: grid;
+  min-width: 0;
+  gap: var(--page-gap);
+  align-content: start;
+}
+
+.backup-settings-card {
+  position: sticky;
+  top: 92px;
 }
 
 .settings-card {
   display: grid;
-  gap: 18px;
-  padding: 24px;
+  gap: 16px;
+  padding: 20px;
 }
 
 .settings-card h2 {
@@ -1389,7 +1428,7 @@ textarea {
 
 .setting-group {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .field-label {
@@ -1399,7 +1438,7 @@ textarea {
 
 .choice-grid {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .theme-choice-grid,
@@ -1410,10 +1449,10 @@ textarea {
 .choice-card {
   display: grid;
   justify-items: start;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  min-height: 92px;
-  padding: 14px;
+  min-height: 82px;
+  padding: 12px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, var(--bg-raised), rgba(255, 255, 255, 0.68));
@@ -1447,7 +1486,7 @@ textarea {
 .choice-card small {
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .swatch-row {
@@ -1464,9 +1503,16 @@ textarea {
 }
 
 .choice-card b {
-  font-size: 25px;
+  font-size: 23px;
   font-weight: 500;
   line-height: 1.08;
+}
+
+@media (min-width: 1280px) {
+  .display-settings-card .theme-choice-grid,
+  .display-settings-card .font-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .font-sample-wenkai b {
@@ -1560,14 +1606,14 @@ textarea {
 }
 
 .settings-actions {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  padding: 0;
 }
 
 .admin-account-card {
-  max-width: 920px;
+  max-width: none;
 }
 
 .admin-account-card > div:first-child {
@@ -1582,6 +1628,7 @@ textarea {
 .admin-account-actions {
   display: flex;
   justify-content: flex-end;
+  padding-top: 2px;
 }
 
 .drawer-backdrop,
@@ -1910,6 +1957,14 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .settings-intro {
+    grid-template-columns: 1fr;
+  }
+
+  .backup-settings-card {
+    position: static;
+  }
+
   .store-hero {
     align-items: start;
   }
@@ -1934,7 +1989,7 @@ textarea {
   }
 
   .settings-actions {
-    grid-column: auto;
+    justify-content: flex-start;
   }
 }
 
