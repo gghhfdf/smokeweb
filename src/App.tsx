@@ -3,10 +3,12 @@ import {
   Archive,
   Check,
   ChevronRight,
+  Cloud,
   Download,
   Eye,
   EyeOff,
   Filter,
+  Gauge,
   Image as ImageIcon,
   LayoutDashboard,
   Lock,
@@ -46,6 +48,11 @@ import {
 } from "./lib/cloud";
 import { defaultSettings } from "./lib/defaults";
 import {
+  formatBytes,
+  IMAGE_COMPRESSION_MAX_BYTES,
+  IMAGE_COMPRESSION_TARGET_BYTES,
+} from "./lib/imageCompression";
+import {
   buildExportPayload,
   clearImages,
   clearJsonState,
@@ -68,6 +75,7 @@ import type {
   ExportPayload,
   FontPreset,
   GridDensity,
+  ImageCompressionStats,
   Product,
   ProductStatus,
   SiteSettings,
@@ -80,6 +88,12 @@ interface ToastMessage {
   id: string;
   kind: ToastKind;
   text: string;
+}
+
+interface UploadReport {
+  id: string;
+  fileName: string;
+  stats: ImageCompressionStats;
 }
 
 const blankProduct: Omit<Product, "id" | "updatedAt"> = {
@@ -416,11 +430,42 @@ export function App() {
     pushToast("商品上下架状态已更新。");
   }
 
+  async function performBulkStatus(status: ProductStatus) {
+    if (isCloudEnabled) {
+      try {
+        applyCloudState(await bulkCloudProductStatus(status));
+        pushToast(status === "live" ? "云端商品已批量上架。" : "云端商品已批量下架。");
+      } catch (error) {
+        pushToast(error instanceof Error ? error.message : "云端批量操作失败。", "danger");
+      }
+      return;
+    }
+
+    updateProducts(
+      state.products.map((product) => ({
+        ...product,
+        status,
+        updatedAt: new Date().toISOString(),
+      })),
+    );
+    pushToast(status === "live" ? "全部商品已上架。" : "全部商品已下架。");
+  }
+
+  function handleBulkStatus(status: ProductStatus) {
+    if (!checkAdmin()) return;
+    const actionText = status === "live" ? "批量上架" : "批量下架";
+    setConfirmAction({
+      title: `${actionText}全部商品？`,
+      body: `这会把当前商品列表全部切换为${status === "live" ? "已上架" : "未上架"}状态，确认后会同步到${isCloudEnabled ? "云端" : "本地"}。`,
+      action: () => performBulkStatus(status),
+    });
+  }
+
   function handleDeleteProduct(product: Product) {
     if (!checkAdmin()) return;
     setConfirmAction({
       title: `删除「${product.name}」？`,
-      body: "删除商品会同时移除它关联的本地图片，操作不可撤销。",
+      body: `删除商品会同时移除它关联的${isCloudEnabled ? "云端" : "本地"}图片，操作不可撤销。`,
       action: async () => {
         if (isCloudEnabled) {
           applyCloudState(await deleteCloudProduct(product.id));
@@ -440,8 +485,8 @@ export function App() {
   async function handleClearAllData() {
     if (!checkAdmin()) return;
     setConfirmAction({
-      title: "清空全部本地数据？",
-      body: "这会删除管理员、商品、设置、年龄确认和所有上传图片。请先导出备份。",
+      title: isCloudEnabled ? "清空全部云端数据？" : "清空全部本地数据？",
+      body: `这会删除管理员、商品、设置和所有上传图片。年龄确认只保存在当前设备。请先导出${isCloudEnabled ? "云端" : "本地"}备份。`,
       action: async () => {
         if (isCloudEnabled) {
           applyCloudState(await clearCloudAll());
@@ -471,25 +516,35 @@ export function App() {
     anchor.download = `cabinet-ops-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    pushToast("本地数据已导出。");
+    pushToast(isCloudEnabled ? "云端数据备份已导出。" : "本地数据已导出。");
   }
 
   async function handleImportData(file: File) {
     if (!requireAdmin("settings")) return;
-    const text = await file.text();
-    const payload = JSON.parse(text) as ExportPayload;
-    const importedState = await importPayload(payload);
-    if (isCloudEnabled) {
-      applyCloudState(importedState);
-      setView("storefront");
-      pushToast("云端数据已导入。");
-      return;
-    }
+    setConfirmAction({
+      title: isCloudEnabled ? "导入并覆盖云端数据？" : "导入并覆盖本地数据？",
+      body: "导入会覆盖当前商品、图片、设置和管理员数据。导入图片会先自动压缩到 30KB 内。",
+      action: async () => {
+        try {
+          const text = await file.text();
+          const payload = JSON.parse(text) as ExportPayload;
+          const importedState = await importPayload(payload);
+          if (isCloudEnabled) {
+            applyCloudState(importedState);
+            setView("storefront");
+            pushToast("云端数据已导入，图片已重新压缩。");
+            return;
+          }
 
-    setState(importedState);
-    setSelectedProductId(importedState.products[0]?.id ?? null);
-    setView("storefront");
-    pushToast("数据已导入。");
+          setState(importedState);
+          setSelectedProductId(importedState.products[0]?.id ?? null);
+          setView("storefront");
+          pushToast("数据已导入，图片已重新压缩。");
+        } catch (error) {
+          pushToast(error instanceof Error ? error.message : "导入失败，请检查备份文件。", "danger");
+        }
+      },
+    });
   }
 
   if (state.settings.requireAgeGate && !state.ageVerified) {
@@ -511,6 +566,7 @@ export function App() {
         brandName={state.settings.brandName}
         view={view}
         isAuthed={isAuthed}
+        cloudEnabled={isCloudEnabled}
         hasAdmin={Boolean(state.adminUser)}
         onNavigate={(nextView) => {
           if (nextView === "admin" || nextView === "settings") {
@@ -527,77 +583,67 @@ export function App() {
         }}
       />
 
-      {view === "login" ? (
-        <AuthScreen
-          adminUser={state.adminUser}
-          onAdminCreated={handleAdminCreated}
-          onLogin={handleLogin}
-          onBrowse={() => setView("storefront")}
-        />
-      ) : null}
+      <div className="view-stack">
+        {view === "login" ? (
+          <div className="view-page">
+            <AuthScreen
+              adminUser={state.adminUser}
+              onAdminCreated={handleAdminCreated}
+              onLogin={handleLogin}
+              onBrowse={() => setView("storefront")}
+            />
+          </div>
+        ) : null}
 
-      {view === "storefront" ? (
-        <Storefront
-          products={state.products}
-          settings={state.settings}
-          selectedProductId={selectedProductId}
-          isAuthed={isAuthed}
-          onSelectProduct={setSelectedProductId}
-          onEdit={(product) => {
-            if (!checkAdmin()) return;
-            setEditingProduct(product);
-          }}
-          onManage={() => requireAdmin("admin")}
-        />
-      ) : null}
+        {view === "storefront" ? (
+          <div className="view-page">
+            <Storefront
+              products={state.products}
+              settings={state.settings}
+              selectedProductId={selectedProductId}
+              isAuthed={isAuthed}
+              onSelectProduct={setSelectedProductId}
+              onEdit={(product) => {
+                if (!checkAdmin()) return;
+                setEditingProduct(product);
+              }}
+              onManage={() => requireAdmin("admin")}
+            />
+          </div>
+        ) : null}
 
-      {view === "admin" ? (
-        <ProductAdmin
-          products={state.products}
-          isAuthed={isAuthed}
-          onCreate={() => setEditingProduct(makeNewProduct())}
-          onEdit={setEditingProduct}
-          onToggleStatus={handleToggleStatus}
-          onDelete={handleDeleteProduct}
-          onBulkStatus={async (status) => {
-            if (!checkAdmin()) return;
-            if (isCloudEnabled) {
-              try {
-                applyCloudState(await bulkCloudProductStatus(status));
-                pushToast(status === "live" ? "云端商品已批量上架。" : "云端商品已批量下架。");
-              } catch (error) {
-                pushToast(error instanceof Error ? error.message : "云端批量操作失败。", "danger");
-              }
-              return;
-            }
+        {view === "admin" ? (
+          <div className="view-page">
+            <ProductAdmin
+              products={state.products}
+              isAuthed={isAuthed}
+              onCreate={() => setEditingProduct(makeNewProduct())}
+              onEdit={setEditingProduct}
+              onToggleStatus={handleToggleStatus}
+              onDelete={handleDeleteProduct}
+              onBulkStatus={handleBulkStatus}
+            />
+          </div>
+        ) : null}
 
-            updateProducts(
-              state.products.map((product) => ({
-                ...product,
-                status,
-                updatedAt: new Date().toISOString(),
-              })),
-            );
-            pushToast(status === "live" ? "全部商品已上架。" : "全部商品已下架。");
-          }}
-        />
-      ) : null}
-
-      {view === "settings" ? (
-        <SettingsPanel
-          settings={state.settings}
-          isAuthed={isAuthed}
-          onSave={updateSettings}
-          onResetAge={() => {
-            setState((current) => ({ ...current, ageVerified: false }));
-            saveAgeVerified(false);
-            pushToast("年龄确认状态已重置。", "warning");
-          }}
-          onExport={handleExportData}
-          onImport={handleImportData}
-          onClearAll={handleClearAllData}
-        />
-      ) : null}
+        {view === "settings" ? (
+          <div className="view-page">
+            <SettingsPanel
+              settings={state.settings}
+              isAuthed={isAuthed}
+              onSave={updateSettings}
+              onResetAge={() => {
+                setState((current) => ({ ...current, ageVerified: false }));
+                saveAgeVerified(false);
+                pushToast("年龄确认状态已重置。", "warning");
+              }}
+              onExport={handleExportData}
+              onImport={handleImportData}
+              onClearAll={handleClearAllData}
+            />
+          </div>
+        ) : null}
+      </div>
 
       {editingProduct ? (
         <ProductEditor
@@ -633,10 +679,19 @@ function makeNewProduct(): Product {
   };
 }
 
+function compressionSavings(stats: ImageCompressionStats): number {
+  if (!stats.originalBytes) return 0;
+  return Math.max(
+    0,
+    Math.round((1 - stats.compressedBytes / stats.originalBytes) * 100),
+  );
+}
+
 function TopNav({
   brandName,
   view,
   isAuthed,
+  cloudEnabled,
   hasAdmin,
   onNavigate,
   onLogin,
@@ -646,6 +701,7 @@ function TopNav({
   brandName: string;
   view: View;
   isAuthed: boolean;
+  cloudEnabled: boolean;
   hasAdmin: boolean;
   onNavigate: (view: View) => void;
   onLogin: () => void;
@@ -671,22 +727,31 @@ function TopNav({
         >
           展示页
         </button>
-        <button
-          className={view === "admin" ? "active" : ""}
-          type="button"
-          onClick={() => onNavigate("admin")}
-        >
-          商品
-        </button>
-        <button
-          className={view === "settings" ? "active" : ""}
-          type="button"
-          onClick={() => onNavigate("settings")}
-        >
-          设置
-        </button>
+        {isAuthed ? (
+          <>
+            <button
+              className={view === "admin" ? "active" : ""}
+              type="button"
+              onClick={() => onNavigate("admin")}
+            >
+              商品
+            </button>
+            <button
+              className={view === "settings" ? "active" : ""}
+              type="button"
+              onClick={() => onNavigate("settings")}
+            >
+              设置
+            </button>
+          </>
+        ) : null}
       </nav>
       <div className="nav-actions">
+        <div className="cloud-status" aria-label={cloudEnabled ? "云端已连接" : "本地演示模式"}>
+          <Cloud size={15} />
+          <span>{cloudEnabled ? "云端已连接" : "本地演示"}</span>
+          <i>{isAuthed ? "管理员已登录" : "访客浏览"}</i>
+        </div>
         {isAuthed ? (
           <button className="button secondary" type="button" onClick={onLogout}>
             <LogOut size={16} />
@@ -698,10 +763,12 @@ function TopNav({
             {hasAdmin ? "管理员登录" : "设置管理员"}
           </button>
         )}
-        <button className="button primary" type="button" onClick={onCreate}>
-          <PackagePlus size={16} />
-          新增商品
-        </button>
+        {isAuthed ? (
+          <button className="button primary" type="button" onClick={onCreate}>
+            <PackagePlus size={16} />
+            新增商品
+          </button>
+        ) : null}
       </div>
     </header>
   );
@@ -727,7 +794,7 @@ function AgeGate({
           <p>成人烟草产品展示</p>
           <h1>请先确认您已达到所在地法定年龄。</h1>
           <span>
-            本网站仅用于商品信息展示与本地库存维护，不提供在线下单、支付或配送流程。
+            本网站仅用于商品信息展示与云端资料维护，不提供在线下单、支付或配送流程。
           </span>
         </div>
         <div className="age-actions">
@@ -745,7 +812,7 @@ function AgeGate({
           <span>Cabinet Ops</span>
           <strong>Premium Display</strong>
         </div>
-        <p>高端明色调商品展示 · 本地管理员后台 · 无下单流程</p>
+        <p>高端明色调商品展示 · 云端管理员后台 · 无下单流程</p>
       </aside>
     </main>
   );
@@ -801,9 +868,9 @@ function AuthScreen({
           <Lock size={15} />
           {adminUser ? "管理员登录" : "首次设置管理员"}
         </div>
-        <h1>{adminUser ? "进入商品管理后台" : "先创建本地管理员账号"}</h1>
+        <h1>{adminUser ? "进入云端商品管理后台" : "先创建云端管理员账号"}</h1>
         <p>
-          管理员权限仅用于本机演示。商品新增、编辑、上下架、设置保存和数据清空都需要登录。
+          管理员权限用于当前展示站。商品新增、编辑、上下架、设置保存和数据清空都需要登录。
         </p>
         <form className="auth-form" onSubmit={handleSubmit}>
           {!adminUser ? (
@@ -933,10 +1000,17 @@ function Storefront({
           <h1>{settings.heroTitle}</h1>
           <p>{settings.heroBody}</p>
           <div className="hero-actions">
-            <button className="button primary" type="button" onClick={onManage}>
-              <LayoutDashboard size={16} />
-              商品管理
-            </button>
+            {isAuthed ? (
+              <button className="button primary" type="button" onClick={onManage}>
+                <LayoutDashboard size={16} />
+                商品管理
+              </button>
+            ) : (
+              <button className="button primary" type="button" onClick={onManage}>
+                <LogIn size={16} />
+                管理员登录
+              </button>
+            )}
             <button
               className="button secondary"
               type="button"
@@ -1259,10 +1333,12 @@ function ProductAdmin({
                 <span>{product.subtitle || "未填写副标题"}</span>
               </div>
             </div>
-            <span>{product.category}</span>
-            <span>¥ {product.price}</span>
-            <span>{product.stock}</span>
-            <StatusBadge status={product.status} />
+            <span data-label="分类">{product.category}</span>
+            <span data-label="价格">¥ {product.price}</span>
+            <span data-label="库存">{product.stock}</span>
+            <div className="table-status" data-label="状态">
+              <StatusBadge status={product.status} />
+            </div>
             <div className="row-actions">
               <button className="icon-button" type="button" aria-label="编辑商品" onClick={() => onEdit(product)}>
                 <Pencil size={16} />
@@ -1299,6 +1375,7 @@ function ProductEditor({
 }) {
   const [draft, setDraft] = useState<Product>(product);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadReports, setUploadReports] = useState<UploadReport[]>([]);
 
   function update<K extends keyof Product>(key: K, value: Product[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -1319,7 +1396,23 @@ function ProductEditor({
           coverImageId: current.coverImageId ?? imageIds[0],
         };
       });
-      onToast("图片已上传。");
+      const reports = records.flatMap((record) =>
+        record.compression
+          ? [
+              {
+                id: record.id,
+                fileName: record.name,
+                stats: record.compression,
+              },
+            ]
+          : [],
+      );
+      setUploadReports(reports);
+      onToast(
+        reports.length
+          ? `图片已压缩上传，单张不超过 ${formatBytes(IMAGE_COMPRESSION_MAX_BYTES)}。`
+          : "图片已上传。",
+      );
     } catch (error) {
       onToast(error instanceof Error ? error.message : "图片上传失败。", "danger");
     } finally {
@@ -1382,6 +1475,39 @@ function ProductEditor({
                   onChange={(event) => handleFiles(event.target.files)}
                 />
               </label>
+            </div>
+            <div className="compression-panel">
+              <div className="compression-panel-header">
+                <Gauge size={17} />
+                <div>
+                  <strong>上传前自动压缩</strong>
+                  <span>
+                    目标 {formatBytes(IMAGE_COMPRESSION_TARGET_BYTES)}，硬上限 {formatBytes(IMAGE_COMPRESSION_MAX_BYTES)}
+                  </span>
+                </div>
+              </div>
+              {uploadReports.length ? (
+                <div className="compression-results">
+                  {uploadReports.map((report) => (
+                    <article key={report.id}>
+                      <strong>{report.fileName}</strong>
+                      <span>
+                        {formatBytes(report.stats.originalBytes)} → {formatBytes(report.stats.compressedBytes)}
+                      </span>
+                      <span>
+                        {report.stats.originalWidth}×{report.stats.originalHeight} → {report.stats.width}×{report.stats.height}
+                      </span>
+                      <span>
+                        {report.stats.type.replace("image/", "").toUpperCase()} · 节省 {compressionSavings(report.stats)}%
+                      </span>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <p>
+                  大图会在浏览器内压缩后再写入 Supabase，减少云端数据库占用。
+                </p>
+              )}
             </div>
             {draft.imageIds.length ? (
               <div className="image-strip">
@@ -1550,8 +1676,8 @@ function SettingsPanel({
           <SettingsIcon size={15} />
           设置
         </div>
-        <h1>品牌展示与本地数据设置</h1>
-        <p>统一控制展示页文案、筛选显示、年龄确认和本地数据备份。</p>
+        <h1>品牌展示与云端数据设置</h1>
+        <p>统一控制展示页文案、筛选显示、年龄确认和云端数据备份。</p>
       </section>
       <form className="settings-grid" onSubmit={handleSubmit}>
         <section className="settings-card">
@@ -1656,7 +1782,21 @@ function SettingsPanel({
           />
         </section>
         <section className="settings-card danger-zone">
-          <h2>本地数据</h2>
+          <h2>{isCloudEnabled ? "云端数据" : "本地数据"}</h2>
+          <p className="settings-note">
+            {isCloudEnabled
+              ? "当前商品、设置、管理员和图片都同步到 Supabase；年龄确认和本设备会话保留在当前浏览器。"
+              : "当前为本地演示模式，商品图片保存在浏览器 IndexedDB。"}
+          </p>
+          <div className="compression-summary">
+            <Gauge size={17} />
+            <div>
+              <strong>图片自动压缩</strong>
+              <span>
+                目标 {formatBytes(IMAGE_COMPRESSION_TARGET_BYTES)}，最高 {formatBytes(IMAGE_COMPRESSION_MAX_BYTES)}
+              </span>
+            </div>
+          </div>
           <button className="button secondary wide" type="button" onClick={onExport}>
             <Download size={16} />
             导出备份
@@ -1831,7 +1971,7 @@ function ConfirmDialog({
   title: string;
   body: string;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }) {
   return (
     <div className="modal-backdrop" role="presentation">

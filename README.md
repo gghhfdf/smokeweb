@@ -1,6 +1,6 @@
 # Cabinet Ops Smokeweb
 
-High-end product showcase for adult tobacco products. The site is a React + Vite frontend deployed on GitHub Pages, with product, image, settings, and local-demo administrator data stored in Supabase.
+High-end product showcase for adult tobacco products. The site is a React + Vite frontend deployed on GitHub Pages, with product, image, settings, administrator, and session data stored in Supabase.
 
 ## Local Development
 

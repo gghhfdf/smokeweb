@@ -1,5 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { defaultSettings } from "./defaults";
+import {
+  blobToDataUrl,
+  compressImageFile,
+  dataUrlToBlob,
+} from "./imageCompression";
 import type {
   AdminUser,
   AppState,
@@ -191,27 +196,15 @@ export async function clearCloudAll(): Promise<AppState> {
   return normalizeState(state);
 }
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 export async function saveCloudImageFile(file: File): Promise<ImageRecord> {
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("图片不能超过 5MB。");
-  }
-
-  const dataUrl = await fileToDataUrl(file);
+  const compressed = await compressImageFile(file);
+  const dataUrl = await blobToDataUrl(compressed.file);
   const id = `image-${crypto.randomUUID()}`;
   const record = await rpc<CloudImagePayload>("cabinet_save_image", {
     p_session_token: getCloudSessionToken(),
     p_id: id,
-    p_name: file.name,
-    p_type: file.type || "image/jpeg",
+    p_name: compressed.file.name,
+    p_type: compressed.file.type || "image/jpeg",
     p_data_url: dataUrl,
   });
 
@@ -219,8 +212,9 @@ export async function saveCloudImageFile(file: File): Promise<ImageRecord> {
     id: record.id,
     name: record.name,
     type: record.type,
-    blob: file,
+    blob: compressed.file,
     createdAt: record.createdAt,
+    compression: compressed.stats,
   };
 }
 
@@ -239,17 +233,6 @@ export async function removeCloudImage(imageId: string): Promise<void> {
     p_session_token: getCloudSessionToken(),
     p_image_id: imageId,
   });
-}
-
-function dataUrlToBlob(dataUrl: string): Blob {
-  const [meta, base64] = dataUrl.split(",");
-  const mime = meta.match(/data:(.*);base64/)?.[1] ?? "image/jpeg";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new Blob([bytes], { type: mime });
 }
 
 export async function listCloudImageRecords(): Promise<ImageRecord[]> {

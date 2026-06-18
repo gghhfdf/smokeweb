@@ -53,6 +53,21 @@ export interface ImageRecord {
   name: string;
   type: string;
   createdAt: string;
+  compression?: ImageCompressionStats;
+}
+
+export interface ImageCompressionStats {
+  originalBytes: number;
+  compressedBytes: number;
+  originalWidth: number;
+  originalHeight: number;
+  width: number;
+  height: number;
+  type: string;
+  quality: number;
+  targetBytes: number;
+  maxBytes: number;
+  iterations: number;
 }
 
 export interface ExportPayload {

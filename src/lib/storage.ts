@@ -7,6 +7,11 @@ import {
   removeCloudImage,
   saveCloudImageFile,
 } from "./cloud";
+import {
+  blobToDataUrl,
+  compressImageFile,
+  dataUrlToBlob,
+} from "./imageCompression";
 import type {
   AdminUser,
   AppState,
@@ -140,16 +145,15 @@ export async function saveImageFile(file: File): Promise<ImageRecord> {
     return saveCloudImageFile(file);
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("图片不能超过 5MB。");
-  }
+  const compressed = await compressImageFile(file);
 
   const record: ImageRecord = {
     id: `image-${crypto.randomUUID()}`,
-    blob: file,
-    name: file.name,
-    type: file.type || "image/jpeg",
+    blob: compressed.file,
+    name: compressed.file.name,
+    type: compressed.file.type || "image/jpeg",
     createdAt: new Date().toISOString(),
+    compression: compressed.stats,
   };
 
   await withImageStore("readwrite", (store) => store.put(record));
@@ -197,26 +201,6 @@ export async function imageRecordToObjectUrl(
   return record ? URL.createObjectURL(record.blob) : null;
 }
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
-
-function dataUrlToBlob(dataUrl: string): Blob {
-  const [meta, base64] = dataUrl.split(",");
-  const mime = meta.match(/data:(.*);base64/)?.[1] ?? "image/jpeg";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new Blob([bytes], { type: mime });
-}
-
 export async function buildExportPayload(
   state: AppState,
 ): Promise<ExportPayload> {
@@ -241,18 +225,43 @@ export async function buildExportPayload(
   };
 }
 
+async function compressImportPayload(payload: ExportPayload): Promise<ExportPayload> {
+  const images = await Promise.all(
+    payload.images.map(async (image) => {
+      const sourceBlob = dataUrlToBlob(image.dataUrl);
+      const sourceFile = new File([sourceBlob], image.name || image.id, {
+        type: image.type || sourceBlob.type || "image/jpeg",
+      });
+      const compressed = await compressImageFile(sourceFile);
+      return {
+        ...image,
+        name: compressed.file.name,
+        type: compressed.file.type,
+        dataUrl: await blobToDataUrl(compressed.file),
+      };
+    }),
+  );
+
+  return {
+    ...payload,
+    images,
+  };
+}
+
 export async function importPayload(payload: ExportPayload): Promise<AppState> {
   if (payload.version !== 1) {
     throw new Error("不支持的数据版本。");
   }
 
+  const compressedPayload = await compressImportPayload(payload);
+
   if (isCloudEnabled) {
-    return importCloudPayload(payload);
+    return importCloudPayload(compressedPayload);
   }
 
   await clearImages();
   await Promise.all(
-    payload.images.map((image) =>
+    compressedPayload.images.map((image) =>
       withImageStore("readwrite", (store) =>
         store.put({
           id: image.id,
@@ -265,22 +274,22 @@ export async function importPayload(payload: ExportPayload): Promise<AppState> {
     ),
   );
 
-  saveAdmin(payload.adminUser);
-  saveProducts(payload.products);
+  saveAdmin(compressedPayload.adminUser);
+  saveProducts(compressedPayload.products);
   const settings = {
     ...defaultSettings,
-    ...payload.settings,
+    ...compressedPayload.settings,
   };
 
   saveSettings(settings);
-  saveAgeVerified(payload.ageVerified);
+  saveAgeVerified(compressedPayload.ageVerified);
   saveSession(null);
 
   return {
-    adminUser: payload.adminUser,
-    products: payload.products,
+    adminUser: compressedPayload.adminUser,
+    products: compressedPayload.products,
     settings,
-    ageVerified: payload.ageVerified,
+    ageVerified: compressedPayload.ageVerified,
     sessionUserId: null,
   };
 }
