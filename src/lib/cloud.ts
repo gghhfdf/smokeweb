@@ -44,7 +44,7 @@ interface CloudImagePayload {
 
 function getClient() {
   if (!supabase) {
-    throw new Error("Supabase 云端配置未启用。");
+    throw new Error("资料同步暂未启用。");
   }
   return supabase;
 }
@@ -89,7 +89,7 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
 function applySessionResult(result: CloudRpcResult): AppState {
   setCloudSessionToken(result.sessionToken ?? null);
   if (!result.state) {
-    throw new Error("云端没有返回有效页面状态。");
+    throw new Error("资料暂时无法读取。");
   }
   return normalizeState(result.state);
 }

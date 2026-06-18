@@ -130,7 +130,7 @@ const themeOptions: Array<{
   {
     value: "xiaowei-porcelain",
     label: "小薇瓷白",
-    body: "瓷白、青蓝、淡墨，适合东方杂志感和后台秩序。",
+    body: "瓷白、青蓝、淡墨，适合东方杂志感和陈列秩序。",
     swatches: ["#f8f7f2", "#163f52", "#8aa9a7"],
   },
   {
@@ -174,7 +174,7 @@ const fontOptions: Array<{
   {
     value: "mashan",
     label: "马善政毛笔",
-    sample: "云端典藏",
+    sample: "雅集典藏",
     body: "书法感强，适合古风主标题和限量款氛围。",
   },
   {
@@ -234,7 +234,7 @@ export function App() {
       })
       .catch((error) => {
         pushToast(
-          error instanceof Error ? error.message : "云端数据读取失败。",
+          error instanceof Error ? error.message : "资料暂时无法读取。",
           "danger",
         );
       });
@@ -246,6 +246,10 @@ export function App() {
 
   useEffect(() => {
     if (state.settings.requireAgeGate && !state.ageVerified) {
+      return;
+    }
+    if (!isAuthed && (view === "admin" || view === "settings")) {
+      setView("login");
       return;
     }
     if (!state.adminUser && view !== "login") {
@@ -285,9 +289,9 @@ export function App() {
     if (isCloudEnabled) {
       try {
         applyCloudState(await saveCloudSettings(settings));
-        pushToast("云端设置已保存。");
+        pushToast("展示设置已保存。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "云端设置保存失败。", "danger");
+        pushToast(error instanceof Error ? error.message : "展示设置保存失败。", "danger");
       }
       return;
     }
@@ -299,7 +303,7 @@ export function App() {
   function requireAdmin(nextView: View = "admin"): boolean {
     if (!isAuthed) {
       setView("login");
-      pushToast("请先登录管理员账号。", "warning");
+      pushToast("请先登录管理席。", "warning");
       return false;
     }
     setView(nextView);
@@ -309,7 +313,7 @@ export function App() {
   function checkAdmin(): boolean {
     if (!isAuthed) {
       setView("login");
-      pushToast("请先登录管理员账号。", "warning");
+      pushToast("请先登录管理席。", "warning");
       return false;
     }
     return true;
@@ -321,9 +325,9 @@ export function App() {
         const cloudState = await createCloudAdmin(admin);
         applyCloudState(cloudState);
         setView("storefront");
-        pushToast("云端管理员已创建，商品编辑权限已开启。");
+        pushToast("管理席已创建。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "云端管理员创建失败。", "danger");
+        pushToast(error instanceof Error ? error.message : "管理席创建失败。", "danger");
       }
       return;
     }
@@ -336,7 +340,7 @@ export function App() {
     saveAdmin(admin);
     saveSession(admin.id);
     setView("storefront");
-    pushToast("管理员已创建，商品编辑权限已开启。");
+    pushToast("管理席已创建。");
   }
 
   async function handleLogin(username: string, password: string) {
@@ -347,7 +351,7 @@ export function App() {
         const cloudState = await loginCloudAdmin(username.trim(), passwordHash);
         applyCloudState(cloudState);
         setView("storefront");
-        pushToast("云端管理员已登录。");
+        pushToast("已进入管理席。");
       } catch {
         pushToast("用户名或密码不正确。", "danger");
       }
@@ -361,7 +365,7 @@ export function App() {
       setState((current) => ({ ...current, sessionUserId: state.adminUser!.id }));
       saveSession(state.adminUser.id);
       setView("storefront");
-      pushToast("管理员已登录。");
+      pushToast("已进入管理席。");
       return;
     }
     pushToast("用户名或密码不正确。", "danger");
@@ -375,14 +379,14 @@ export function App() {
         setState((current) => ({ ...current, sessionUserId: null }));
       }
       setView("storefront");
-      pushToast("已退出云端管理员模式。", "warning");
+      pushToast("已退出管理席。", "warning");
       return;
     }
 
     setState((current) => ({ ...current, sessionUserId: null }));
     saveSession(null);
     setView("storefront");
-    pushToast("已退出管理员模式。", "warning");
+    pushToast("已退出管理席。", "warning");
   }
 
   function handleAgeVerified() {
@@ -394,7 +398,7 @@ export function App() {
   }
 
   function handleAgeDeclined() {
-    pushToast("未确认法定年龄前无法浏览该展示页。", "danger");
+    pushToast("需要确认法定年龄后才能进入。", "danger");
   }
 
   async function handleSaveProduct(product: Product) {
@@ -411,9 +415,9 @@ export function App() {
         applyCloudState(await saveCloudProduct(updatedProduct));
         setEditingProduct(null);
         setSelectedProductId(updatedProduct.id);
-        pushToast(exists ? "云端商品信息已更新。" : "云端商品已新增。");
+        pushToast(exists ? "商品档案已更新。" : "商品已加入陈列。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "云端商品保存失败。", "danger");
+        pushToast(error instanceof Error ? error.message : "商品保存失败。", "danger");
       }
       return;
     }
@@ -426,7 +430,7 @@ export function App() {
     updateProducts(products);
     setEditingProduct(null);
     setSelectedProductId(updatedProduct.id);
-    pushToast(exists ? "商品信息已更新。" : "商品已新增。");
+    pushToast(exists ? "商品档案已更新。" : "商品已加入陈列。");
   }
 
   async function handleToggleStatus(productId: string, status?: ProductStatus) {
@@ -434,9 +438,9 @@ export function App() {
     if (isCloudEnabled) {
       try {
         applyCloudState(await setCloudProductStatus(productId, status));
-        pushToast("云端商品上下架状态已更新。");
+        pushToast("展示状态已更新。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "云端上下架失败。", "danger");
+        pushToast(error instanceof Error ? error.message : "状态切换失败。", "danger");
       }
       return;
     }
@@ -451,16 +455,16 @@ export function App() {
       };
     });
     updateProducts(products);
-    pushToast("商品上下架状态已更新。");
+    pushToast("展示状态已更新。");
   }
 
   async function performBulkStatus(status: ProductStatus) {
     if (isCloudEnabled) {
       try {
         applyCloudState(await bulkCloudProductStatus(status));
-        pushToast(status === "live" ? "云端商品已批量上架。" : "云端商品已批量下架。");
+        pushToast(status === "live" ? "已批量上架。" : "已批量下架。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "云端批量操作失败。", "danger");
+        pushToast(error instanceof Error ? error.message : "批量操作失败。", "danger");
       }
       return;
     }
@@ -480,7 +484,7 @@ export function App() {
     const actionText = status === "live" ? "批量上架" : "批量下架";
     setConfirmAction({
       title: `${actionText}全部商品？`,
-      body: `这会把当前商品列表全部切换为${status === "live" ? "已上架" : "未上架"}状态，确认后会同步到${isCloudEnabled ? "云端" : "本地"}。`,
+      body: `这会把当前商品列表全部切换为${status === "live" ? "已上架" : "未上架"}状态，确认后立即生效。`,
       action: () => performBulkStatus(status),
     });
   }
@@ -489,11 +493,11 @@ export function App() {
     if (!checkAdmin()) return;
     setConfirmAction({
       title: `删除「${product.name}」？`,
-      body: `删除商品会同时移除它关联的${isCloudEnabled ? "云端" : "本地"}图片，操作不可撤销。`,
+      body: "删除商品会同时移除它关联的图片，操作不可撤销。",
       action: async () => {
         if (isCloudEnabled) {
           applyCloudState(await deleteCloudProduct(product.id));
-          pushToast("云端商品已删除。", "warning");
+          pushToast("商品已删除。", "warning");
           return;
         }
 
@@ -509,13 +513,13 @@ export function App() {
   async function handleClearAllData() {
     if (!checkAdmin()) return;
     setConfirmAction({
-      title: isCloudEnabled ? "清空全部云端数据？" : "清空全部本地数据？",
-      body: `这会删除管理员、商品、设置和所有上传图片。年龄确认只保存在当前设备。请先导出${isCloudEnabled ? "云端" : "本地"}备份。`,
+      title: "清空全部资料？",
+      body: "这会删除管理席、商品、设置和所有上传图片。请先导出备份。",
       action: async () => {
         if (isCloudEnabled) {
           applyCloudState(await clearCloudAll());
           setView("login");
-          pushToast("云端数据已清空。", "warning");
+          pushToast("全部资料已清空。", "warning");
           return;
         }
 
@@ -524,7 +528,7 @@ export function App() {
         setState(initialAppState);
         setView("login");
         setSelectedProductId(initialAppState.products[0]?.id ?? null);
-        pushToast("本地数据已清空。", "warning");
+        pushToast("全部资料已清空。", "warning");
       },
     });
   }
@@ -540,14 +544,14 @@ export function App() {
     anchor.download = `cabinet-ops-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-    pushToast(isCloudEnabled ? "云端数据备份已导出。" : "本地数据已导出。");
+    pushToast("备份已导出。");
   }
 
   async function handleImportData(file: File) {
     if (!requireAdmin("settings")) return;
     setConfirmAction({
-      title: isCloudEnabled ? "导入并覆盖云端数据？" : "导入并覆盖本地数据？",
-      body: "导入会覆盖当前商品、图片、设置和管理员数据。导入图片会先自动压缩到 30KB 内。",
+      title: "导入并覆盖现有资料？",
+      body: "导入会覆盖当前商品、图片、设置和管理席资料。图片会先自动压缩到 30KB 内。",
       action: async () => {
         try {
           const text = await file.text();
@@ -556,14 +560,14 @@ export function App() {
           if (isCloudEnabled) {
             applyCloudState(importedState);
             setView("storefront");
-            pushToast("云端数据已导入，图片已重新压缩。");
+            pushToast("备份已导入，图片已重新压缩。");
             return;
           }
 
           setState(importedState);
           setSelectedProductId(importedState.products[0]?.id ?? null);
           setView("storefront");
-          pushToast("数据已导入，图片已重新压缩。");
+          pushToast("备份已导入，图片已重新压缩。");
         } catch (error) {
           pushToast(error instanceof Error ? error.message : "导入失败，请检查备份文件。", "danger");
         }
@@ -650,7 +654,7 @@ export function App() {
           </div>
         ) : null}
 
-        {view === "settings" ? (
+        {view === "settings" && isAuthed ? (
           <div className="view-page">
             <SettingsPanel
               settings={state.settings}
@@ -659,7 +663,7 @@ export function App() {
               onResetAge={() => {
                 setState((current) => ({ ...current, ageVerified: false }));
                 saveAgeVerified(false);
-                pushToast("年龄确认状态已重置。", "warning");
+                pushToast("年龄确认已重置。", "warning");
               }}
               onExport={handleExportData}
               onImport={handleImportData}
@@ -771,10 +775,10 @@ function TopNav({
         ) : null}
       </nav>
       <div className="nav-actions">
-        <div className="cloud-status" aria-label={cloudEnabled ? "云端已连接" : "本地演示模式"}>
+        <div className="cloud-status" aria-label={cloudEnabled ? "资料已同步" : "离线预览"}>
           <Cloud size={15} />
-          <span>{cloudEnabled ? "云端已连接" : "本地演示"}</span>
-          <i>{isAuthed ? "管理员已登录" : "访客浏览"}</i>
+          <span>{cloudEnabled ? "资料已同步" : "离线预览"}</span>
+          <i>{isAuthed ? "管理席" : "游客模式"}</i>
         </div>
         {isAuthed ? (
           <button className="button secondary" type="button" onClick={onLogout}>
@@ -784,7 +788,7 @@ function TopNav({
         ) : (
           <button className="button secondary" type="button" onClick={onLogin}>
             <LogIn size={16} />
-            {hasAdmin ? "管理员登录" : "设置管理员"}
+            {hasAdmin ? "管理席登录" : "创建管理席"}
           </button>
         )}
         {isAuthed ? (
@@ -815,10 +819,10 @@ function AgeGate({
           <strong>{brandName}</strong>
         </div>
         <div className="age-copy">
-          <p>成人烟草产品展示</p>
+          <p>成人精选目录</p>
           <h1>请先确认您已达到所在地法定年龄。</h1>
           <span>
-            本网站仅用于商品信息展示与云端资料维护，不提供在线下单、支付或配送流程。
+            精选系列仅向达到法定年龄的访客开放，内容用于品牌陈列与产品识别。
           </span>
         </div>
         <div className="age-actions">
@@ -833,10 +837,10 @@ function AgeGate({
       </section>
       <aside className="age-side">
         <div>
-          <span>Cabinet Ops</span>
-          <strong>Premium Display</strong>
+          <span>Bright Collection</span>
+          <strong>Mature Taste</strong>
         </div>
-        <p>高端明色调商品展示 · 云端管理员后台 · 无下单流程</p>
+        <p>明色东方 · 精选陈列 · 从容浏览</p>
       </aside>
     </main>
   );
@@ -853,7 +857,7 @@ function AuthScreen({
   onLogin: (username: string, password: string) => Promise<void>;
   onBrowse: () => void;
 }) {
-  const [displayName, setDisplayName] = useState("店铺管理员");
+  const [displayName, setDisplayName] = useState("陈列管理员");
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -874,7 +878,7 @@ function AuthScreen({
     if (!adminUser) {
       await onAdminCreated({
         id: `admin-${crypto.randomUUID()}`,
-        displayName: displayName.trim() || "店铺管理员",
+        displayName: displayName.trim() || "陈列管理员",
         username: username.trim(),
         passwordHash: await hashPassword(password),
         createdAt: new Date().toISOString(),
@@ -890,11 +894,11 @@ function AuthScreen({
       <section className="auth-card">
         <div className="section-label">
           <Lock size={15} />
-          {adminUser ? "管理员登录" : "首次设置管理员"}
+          {adminUser ? "管理席登录" : "首次创建管理席"}
         </div>
-        <h1>{adminUser ? "进入云端商品管理后台" : "先创建云端管理员账号"}</h1>
+        <h1>{adminUser ? "登录管理席" : "创建管理席"}</h1>
         <p>
-          管理员权限用于当前展示站。商品新增、编辑、上下架、设置保存和数据清空都需要登录。
+          登录后可整理商品档案、展示状态与品牌风格。游客可直接进入橱窗浏览。
         </p>
         <form className="auth-form" onSubmit={handleSubmit}>
           {!adminUser ? (
@@ -903,7 +907,7 @@ function AuthScreen({
               <input
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="例如：门店管理员"
+                placeholder="例如：陈列管理员"
               />
             </label>
           ) : null}
@@ -939,26 +943,25 @@ function AuthScreen({
           </label>
           {error ? <p className="field-error">{error}</p> : null}
           <button className="button primary wide" type="submit">
-            {adminUser ? "登录管理员" : "创建并进入"}
+            {adminUser ? "登录管理席" : "创建管理席"}
           </button>
-          {!adminUser ? (
-            <button className="button ghost wide" type="button" onClick={onBrowse}>
-              先浏览展示页
-            </button>
-          ) : null}
+          <button className="button ghost wide" type="button" onClick={onBrowse}>
+            <Eye size={16} />
+            游客模式
+          </button>
         </form>
       </section>
       <section className="auth-preview">
         <div className="preview-window">
           <div className="preview-toolbar">
-            <span>展示页</span>
-            <button type="button">预览</button>
+            <span>精选橱窗</span>
+            <button type="button">浏览</button>
           </div>
           <div className="preview-hero">
             <ImageIcon size={40} />
             <div>
-              <h2>真实商品图上传后呈现在这里</h2>
-              <p>后台会保留图片封面、状态、价格、规格和库存信息。</p>
+              <h2>商品封面将在这里呈现</h2>
+              <p>封面、规格、价格与库存会以统一版式展示。</p>
             </div>
           </div>
         </div>
@@ -1019,7 +1022,7 @@ function Storefront({
         <div className="hero-copy">
           <div className="section-label">
             <Archive size={15} />
-            Premium Operations
+            精选目录
           </div>
           <h1>{settings.heroTitle}</h1>
           <p>{settings.heroBody}</p>
@@ -1032,7 +1035,7 @@ function Storefront({
             ) : (
               <button className="button primary" type="button" onClick={onManage}>
                 <LogIn size={16} />
-                管理员登录
+                管理席登录
               </button>
             )}
             <button
@@ -1047,8 +1050,8 @@ function Storefront({
         </div>
         <div className="showcase-panel">
           <div className="showcase-toolbar">
-            <span>当前展示页</span>
-            <span>{isAuthed ? "管理员模式" : "访客模式"}</span>
+            <span>今日陈列</span>
+            <span>{isAuthed ? "管理视图" : "游客浏览"}</span>
           </div>
           <div className="showcase-body">
             <ImageFrame
@@ -1058,7 +1061,7 @@ function Storefront({
             />
             <div>
               <h2>{selectedProduct?.name ?? "暂无商品"}</h2>
-              <p>{selectedProduct?.subtitle ?? "请在后台添加商品。"}</p>
+              <p>{selectedProduct?.subtitle ?? "精选商品正在整理。"}</p>
               {selectedProduct ? (
                 <div className="hero-meta">
                   {settings.showPrice ? <span>¥ {selectedProduct.price}</span> : null}
@@ -1071,7 +1074,7 @@ function Storefront({
             </div>
           </div>
         </div>
-        <aside className="hero-stats" aria-label="展示概况">
+        <aside className="hero-stats" aria-label="陈列概况">
           <StatCard label="在售" value={String(liveCount)} />
           <StatCard label="未上架" value={String(draftCount)} />
           <StatCard
@@ -1149,7 +1152,7 @@ function Storefront({
             <EmptyState
               icon={<Filter size={26} />}
               title="没有符合条件的商品"
-              body="调整搜索、分类或上下架状态后再查看。"
+              body="换个关键词或分类看看。"
             />
           )}
         </div>
@@ -1223,7 +1226,7 @@ function ProductDetail({
         <EmptyState
           icon={<ImageIcon size={24} />}
           title="暂无商品详情"
-          body="新增商品后会在这里显示完整信息。"
+          body="挑选或新增商品后会在这里显示完整信息。"
         />
       </aside>
     );
@@ -1266,7 +1269,7 @@ function ProductDetail({
           编辑商品
         </button>
       ) : (
-        <p className="permission-note">登录管理员后可编辑、上架或下架商品。</p>
+        <p className="permission-note">精选信息会随陈列更新。</p>
       )}
     </aside>
   );
@@ -1298,7 +1301,7 @@ function ProductAdmin({
         <EmptyState
           icon={<Lock size={28} />}
           title="需要管理员权限"
-          body="请先登录管理员账号，再维护商品。"
+          body="请先登录管理席。"
         />
       </main>
     );
@@ -1312,8 +1315,8 @@ function ProductAdmin({
             <LayoutDashboard size={15} />
             商品管理
           </div>
-          <h1>展示与运营一体化控制台</h1>
-          <p>维护商品图、规格、价格、库存和上下架状态。这里没有下单流程。</p>
+          <h1>商品陈列管理</h1>
+          <p>集中调整商品图、规格、价格、库存与展示状态。</p>
         </div>
         <button className="button primary" type="button" onClick={onCreate}>
           <PackagePlus size={16} />
@@ -1328,7 +1331,7 @@ function ProductAdmin({
       <section className="admin-toolbar">
         <div className="section-label">
           <SlidersHorizontal size={15} />
-          批量操作
+          展示状态
         </div>
         <div>
           <button className="button secondary" type="button" onClick={() => onBulkStatus("live")}>
@@ -1364,16 +1367,19 @@ function ProductAdmin({
               <StatusBadge status={product.status} />
             </div>
             <div className="row-actions">
-              <button className="icon-button" type="button" aria-label="编辑商品" onClick={() => onEdit(product)}>
-                <Pencil size={16} />
-              </button>
               <button
-                className="icon-button"
+                className={`button status-action ${
+                  product.status === "live" ? "unpublish" : "publish"
+                }`}
                 type="button"
                 aria-label={product.status === "live" ? "下架商品" : "上架商品"}
                 onClick={() => onToggleStatus(product.id)}
               >
                 {product.status === "live" ? <EyeOff size={16} /> : <Eye size={16} />}
+                {product.status === "live" ? "下架" : "上架"}
+              </button>
+              <button className="icon-button" type="button" aria-label="编辑商品" onClick={() => onEdit(product)}>
+                <Pencil size={16} />
               </button>
               <button className="icon-button danger" type="button" aria-label="删除商品" onClick={() => onDelete(product)}>
                 <Trash2 size={16} />
@@ -1479,7 +1485,10 @@ function ProductEditor({
         <div className="drawer-header">
           <div>
             <span>商品档案</span>
-            <h2>{product.name ? "编辑商品" : "新增商品"}</h2>
+            <div className="drawer-title-line">
+              <h2>{product.name ? "编辑商品" : "新增商品"}</h2>
+              <StatusBadge status={draft.status} />
+            </div>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="关闭">
             <X size={18} />
@@ -1529,7 +1538,7 @@ function ProductEditor({
                 </div>
               ) : (
                 <p>
-                  大图会在浏览器内压缩后再写入 Supabase，减少云端数据库占用。
+                  上传图片会自动压缩成轻量版本，保持不同设备打开顺滑。
                 </p>
               )}
             </div>
@@ -1599,18 +1608,6 @@ function ProductEditor({
                 min={0}
                 onChange={(event) => update("stock", Number(event.target.value))}
               />
-            </label>
-            <label>
-              <span>状态</span>
-              <select
-                value={draft.status}
-                onChange={(event) =>
-                  update("status", event.target.value as ProductStatus)
-                }
-              >
-                <option value="live">已上架</option>
-                <option value="draft">未上架</option>
-              </select>
             </label>
             <label className="toggle-row">
               <input
@@ -1687,7 +1684,7 @@ function SettingsPanel({
         <EmptyState
           icon={<Lock size={28} />}
           title="需要管理员权限"
-          body="设置页包含数据导入导出和展示开关，请先登录管理员账号。"
+          body="请先登录管理席。"
         />
       </main>
     );
@@ -1700,8 +1697,8 @@ function SettingsPanel({
           <SettingsIcon size={15} />
           设置
         </div>
-        <h1>品牌展示与云端数据设置</h1>
-        <p>统一控制展示页文案、筛选显示、年龄确认和云端数据备份。</p>
+        <h1>品牌橱窗设置</h1>
+        <p>调整首页文案、陈列风格、字体主题与资料备份。</p>
       </section>
       <form className="settings-grid" onSubmit={handleSubmit}>
         <section className="settings-card">
@@ -1806,11 +1803,11 @@ function SettingsPanel({
           />
         </section>
         <section className="settings-card danger-zone">
-          <h2>{isCloudEnabled ? "云端数据" : "本地数据"}</h2>
+          <h2>资料备份</h2>
           <p className="settings-note">
             {isCloudEnabled
-              ? "当前商品、设置、管理员和图片都同步到 Supabase；年龄确认和本设备会话保留在当前浏览器。"
-              : "当前为本地演示模式，商品图片保存在浏览器 IndexedDB。"}
+              ? "商品、图片与展示设置会保持同步；年龄确认会按访客环境记住。"
+              : "当前为离线预览，适合临时整理陈列内容。"}
           </p>
           <div className="compression-summary">
             <Gauge size={17} />
@@ -1842,7 +1839,7 @@ function SettingsPanel({
           </button>
           <button className="button danger wide" type="button" onClick={onClearAll}>
             <Trash2 size={16} />
-            清空全部数据
+            清空全部资料
           </button>
         </section>
         <div className="settings-actions">

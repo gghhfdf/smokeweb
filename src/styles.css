@@ -349,12 +349,18 @@ select:focus-visible {
 }
 
 .top-nav nav button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 74px;
   height: 38px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   transition:
     transform var(--motion-fast) var(--ease-out),
     border-color var(--motion-fast) ease,
@@ -387,6 +393,7 @@ select:focus-visible {
   display: inline-grid;
   grid-template-columns: auto auto;
   align-items: center;
+  justify-items: start;
   column-gap: 7px;
   row-gap: 1px;
   min-height: 40px;
@@ -436,12 +443,24 @@ select:focus-visible {
   padding: 0 16px;
   background: var(--bg-raised);
   color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1;
   text-decoration: none;
+  white-space: nowrap;
   transition:
     transform var(--motion-standard) var(--ease-spring),
     border-color var(--motion-fast) ease,
     background var(--motion-fast) ease,
     box-shadow var(--motion-standard) var(--ease-out);
+}
+
+.button svg,
+.icon-button svg,
+.upload-button svg,
+.upload-data svg,
+.top-nav nav button svg,
+.preview-toolbar button svg {
+  flex: 0 0 auto;
 }
 
 .button:hover,
@@ -516,8 +535,10 @@ select:focus-visible {
   color: var(--accent);
   font-family: var(--font-brand);
   font-size: 13px;
+  line-height: 1;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .age-gate {
@@ -1073,6 +1094,9 @@ textarea {
   border-radius: var(--radius-full);
   padding: 0 10px;
   font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .status-live {
@@ -1192,11 +1216,16 @@ textarea {
 }
 
 .admin-intro {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 24px;
   padding: 28px;
+}
+
+.admin-intro > .button {
+  justify-self: end;
+  align-self: center;
 }
 
 .admin-intro h1,
@@ -1230,7 +1259,7 @@ textarea {
 .table-head,
 .table-row {
   display: grid;
-  grid-template-columns: minmax(280px, 1.7fr) 0.7fr 0.6fr 0.6fr 0.7fr 150px;
+  grid-template-columns: minmax(280px, 1.45fr) 0.62fr 0.5fr 0.5fr 0.62fr minmax(210px, 0.9fr);
   align-items: center;
   gap: 16px;
   padding: 0 20px;
@@ -1240,7 +1269,12 @@ textarea {
   min-height: 50px;
   color: var(--text-muted);
   font-size: 13px;
+  line-height: 1;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.table-head span:last-child {
+  text-align: right;
 }
 
 .table-row {
@@ -1249,6 +1283,10 @@ textarea {
   transition:
     background var(--motion-fast) ease,
     transform var(--motion-fast) var(--ease-out);
+}
+
+.table-row > span {
+  line-height: 1.45;
 }
 
 .table-row:hover {
@@ -1279,12 +1317,34 @@ textarea {
 
 .row-actions {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  min-width: 0;
 }
 
 .table-status {
   display: flex;
   align-items: center;
+}
+
+.status-action {
+  min-width: 82px;
+  min-height: 38px;
+  padding: 0 12px;
+  box-shadow: none;
+}
+
+.status-action.publish {
+  border-color: color-mix(in srgb, var(--success-text) 22%, transparent);
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.status-action.unpublish {
+  border-color: color-mix(in srgb, var(--warning-text) 20%, transparent);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-primary);
 }
 
 .settings-page {
@@ -1543,6 +1603,17 @@ textarea {
   margin: 8px 0 0;
   font-size: 32px;
   font-weight: 500;
+}
+
+.drawer-title-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.drawer-title-line h2 {
+  margin: 0;
 }
 
 .image-uploader {
@@ -1930,6 +2001,14 @@ textarea {
     flex-direction: column;
   }
 
+  .admin-intro {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-intro > .button {
+    justify-self: stretch;
+  }
+
   .table-head {
     display: none;
   }
@@ -1958,9 +2037,15 @@ textarea {
   }
 
   .row-actions {
+    display: grid;
+    grid-template-columns: minmax(118px, 1fr) 42px 42px;
     width: 100%;
-    justify-content: flex-start;
+    justify-content: stretch;
     padding-top: 4px;
+  }
+
+  .row-actions .status-action {
+    width: 100%;
   }
 
   .compression-results article {

@@ -150,7 +150,7 @@ export async function compressImageFile(
 
   if (!context) {
     image.dispose();
-    throw new Error("当前浏览器不支持图片压缩。");
+    throw new Error("当前设备暂不支持图片处理，请换用新版浏览器。");
   }
 
   let best:
