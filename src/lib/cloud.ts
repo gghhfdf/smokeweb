@@ -185,6 +185,28 @@ export async function saveCloudSettings(
   );
 }
 
+export async function updateCloudAdmin({
+  displayName,
+  username,
+  currentPasswordHash,
+  newPasswordHash,
+}: {
+  displayName: string;
+  username: string;
+  currentPasswordHash: string;
+  newPasswordHash?: string | null;
+}): Promise<AppState> {
+  return normalizeState(
+    await rpc<AppState>("cabinet_update_admin", {
+      p_session_token: getCloudSessionToken(),
+      p_display_name: displayName,
+      p_username: username,
+      p_current_password_hash: currentPasswordHash,
+      p_new_password_hash: newPasswordHash,
+    }),
+  );
+}
+
 export async function clearCloudAll(): Promise<AppState> {
   const state = await rpc<AppState>("cabinet_clear_all", {
     p_session_token: getCloudSessionToken(),

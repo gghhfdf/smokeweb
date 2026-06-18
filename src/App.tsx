@@ -45,6 +45,7 @@ import {
   saveCloudProduct,
   saveCloudSettings,
   setCloudProductStatus,
+  updateCloudAdmin,
 } from "./lib/cloud";
 import { defaultSettings } from "./lib/defaults";
 import {
@@ -94,6 +95,13 @@ interface UploadReport {
   id: string;
   fileName: string;
   stats: ImageCompressionStats;
+}
+
+interface AdminUpdateInput {
+  displayName: string;
+  username: string;
+  currentPassword: string;
+  newPassword: string;
 }
 
 const blankProduct: Omit<Product, "id" | "updatedAt"> = {
@@ -298,6 +306,65 @@ export function App() {
 
     setState((current) => ({ ...current, settings }));
     saveSettings(settings);
+  }
+
+  function adminUpdateErrorMessage(error: unknown): string {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (message.includes("current password")) return "当前密码不正确。";
+    if (message.includes("username")) return "用户名已被使用。";
+    if (message.includes("session")) return "登录已过期，请重新登录。";
+    return "管理员账号保存失败。";
+  }
+
+  async function handleUpdateAdmin(input: AdminUpdateInput): Promise<boolean> {
+    if (!state.adminUser || !checkAdmin()) return false;
+
+    const username = input.username.trim();
+    const displayName = input.displayName.trim() || "陈列管理员";
+    const currentPasswordHash = await hashPassword(input.currentPassword);
+    const newPasswordHash = input.newPassword
+      ? await hashPassword(input.newPassword)
+      : null;
+
+    if (isCloudEnabled) {
+      try {
+        applyCloudState(
+          await updateCloudAdmin({
+            displayName,
+            username,
+            currentPasswordHash,
+            newPasswordHash,
+          }),
+        );
+        pushToast("管理员账号已更新。");
+        return true;
+      } catch (error) {
+        pushToast(adminUpdateErrorMessage(error), "danger");
+        return false;
+      }
+    }
+
+    if (currentPasswordHash !== state.adminUser.passwordHash) {
+      pushToast("当前密码不正确。", "danger");
+      return false;
+    }
+
+    const updatedAdmin: AdminUser = {
+      ...state.adminUser,
+      displayName,
+      username,
+      passwordHash: newPasswordHash ?? state.adminUser.passwordHash,
+    };
+
+    setState((current) => ({
+      ...current,
+      adminUser: updatedAdmin,
+      sessionUserId: updatedAdmin.id,
+    }));
+    saveAdmin(updatedAdmin);
+    saveSession(updatedAdmin.id);
+    pushToast("管理员账号已更新。");
+    return true;
   }
 
   function requireAdmin(nextView: View = "admin"): boolean {
@@ -631,11 +698,6 @@ export function App() {
               selectedProductId={selectedProductId}
               isAuthed={isAuthed}
               onSelectProduct={setSelectedProductId}
-              onEdit={(product) => {
-                if (!checkAdmin()) return;
-                setEditingProduct(product);
-              }}
-              onManage={() => requireAdmin("admin")}
             />
           </div>
         ) : null}
@@ -657,9 +719,11 @@ export function App() {
         {view === "settings" && isAuthed ? (
           <div className="view-page">
             <SettingsPanel
+              adminUser={state.adminUser}
               settings={state.settings}
               isAuthed={isAuthed}
               onSave={updateSettings}
+              onUpdateAdmin={handleUpdateAdmin}
               onResetAge={() => {
                 setState((current) => ({ ...current, ageVerified: false }));
                 saveAgeVerified(false);
@@ -976,16 +1040,12 @@ function Storefront({
   selectedProductId,
   isAuthed,
   onSelectProduct,
-  onEdit,
-  onManage,
 }: {
   products: Product[];
   settings: SiteSettings;
   selectedProductId: string | null;
   isAuthed: boolean;
   onSelectProduct: (id: string) => void;
-  onEdit: (product: Product) => void;
-  onManage: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("全部");
@@ -1027,19 +1087,8 @@ function Storefront({
           <h1>{settings.heroTitle}</h1>
           <p>{settings.heroBody}</p>
           <div className="hero-actions">
-            {isAuthed ? (
-              <button className="button primary" type="button" onClick={onManage}>
-                <LayoutDashboard size={16} />
-                商品管理
-              </button>
-            ) : (
-              <button className="button primary" type="button" onClick={onManage}>
-                <LogIn size={16} />
-                管理席登录
-              </button>
-            )}
             <button
-              className="button secondary"
+              className="button primary"
               type="button"
               onClick={() => selectedProduct && onSelectProduct(selectedProduct.id)}
             >
@@ -1143,9 +1192,7 @@ function Storefront({
                 product={product}
                 settings={settings}
                 selected={selectedProduct?.id === product.id}
-                isAuthed={isAuthed}
                 onSelect={() => onSelectProduct(product.id)}
-                onEdit={() => onEdit(product)}
               />
             ))
           ) : (
@@ -1159,8 +1206,6 @@ function Storefront({
         <ProductDetail
           product={selectedProduct}
           settings={settings}
-          isAuthed={isAuthed}
-          onEdit={onEdit}
         />
       </section>
     </main>
@@ -1171,16 +1216,12 @@ function ProductCard({
   product,
   settings,
   selected,
-  isAuthed,
   onSelect,
-  onEdit,
 }: {
   product: Product;
   settings: SiteSettings;
   selected: boolean;
-  isAuthed: boolean;
   onSelect: () => void;
-  onEdit: () => void;
 }) {
   return (
     <article className={`product-card ${selected ? "selected" : ""}`}>
@@ -1198,12 +1239,6 @@ function ProductCard({
           <span>{product.specs}</span>
           {settings.showStock ? <span>库存 {product.stock}</span> : null}
         </div>
-        {isAuthed ? (
-          <button className="button quiet" type="button" onClick={onEdit}>
-            <Pencil size={15} />
-            编辑
-          </button>
-        ) : null}
       </div>
     </article>
   );
@@ -1212,13 +1247,9 @@ function ProductCard({
 function ProductDetail({
   product,
   settings,
-  isAuthed,
-  onEdit,
 }: {
   product?: Product;
   settings: SiteSettings;
-  isAuthed: boolean;
-  onEdit: (product: Product) => void;
 }) {
   if (!product) {
     return (
@@ -1226,7 +1257,7 @@ function ProductDetail({
         <EmptyState
           icon={<ImageIcon size={24} />}
           title="暂无商品详情"
-          body="挑选或新增商品后会在这里显示完整信息。"
+          body="挑选商品后会在这里显示完整信息。"
         />
       </aside>
     );
@@ -1263,14 +1294,6 @@ function ProductDetail({
           </div>
         ) : null}
       </dl>
-      {isAuthed ? (
-        <button className="button primary wide" type="button" onClick={() => onEdit(product)}>
-          <Pencil size={16} />
-          编辑商品
-        </button>
-      ) : (
-        <p className="permission-note">精选信息会随陈列更新。</p>
-      )}
     </aside>
   );
 }
@@ -1642,17 +1665,21 @@ function ProductEditor({
 }
 
 function SettingsPanel({
+  adminUser,
   settings,
   isAuthed,
   onSave,
+  onUpdateAdmin,
   onResetAge,
   onExport,
   onImport,
   onClearAll,
 }: {
+  adminUser: AdminUser | null;
   settings: SiteSettings;
   isAuthed: boolean;
   onSave: (settings: SiteSettings) => void | Promise<void>;
+  onUpdateAdmin: (input: AdminUpdateInput) => Promise<boolean>;
   onResetAge: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
@@ -1660,12 +1687,33 @@ function SettingsPanel({
 }) {
   const [draft, setDraft] = useState(settings);
   const [isDirty, setIsDirty] = useState(false);
+  const [adminDraft, setAdminDraft] = useState({
+    displayName: adminUser?.displayName ?? "",
+    username: adminUser?.username ?? "",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [adminDirty, setAdminDirty] = useState(false);
+  const [adminError, setAdminError] = useState("");
 
   useEffect(() => {
     if (!isDirty) {
       setDraft(settings);
     }
   }, [isDirty, settings]);
+
+  useEffect(() => {
+    if (!adminDirty) {
+      setAdminDraft({
+        displayName: adminUser?.displayName ?? "",
+        username: adminUser?.username ?? "",
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    }
+  }, [adminDirty, adminUser]);
 
   function update<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
     setIsDirty(true);
@@ -1676,6 +1724,62 @@ function SettingsPanel({
     event.preventDefault();
     await onSave(draft);
     setIsDirty(false);
+  }
+
+  function updateAdminDraft(
+    key: keyof typeof adminDraft,
+    value: string,
+  ) {
+    setAdminDirty(true);
+    setAdminError("");
+    setAdminDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  async function handleAdminSubmit(event: FormEvent) {
+    event.preventDefault();
+    const username = adminDraft.username.trim();
+    const displayName = adminDraft.displayName.trim();
+
+    if (!username) {
+      setAdminError("请输入新的管理员用户名。");
+      return;
+    }
+
+    if (!adminDraft.currentPassword) {
+      setAdminError("请输入当前密码确认身份。");
+      return;
+    }
+
+    if (adminDraft.newPassword || adminDraft.confirmPassword) {
+      if (!isStrongEnoughPassword(adminDraft.newPassword)) {
+        setAdminError("新密码至少需要 6 位。");
+        return;
+      }
+
+      if (adminDraft.newPassword !== adminDraft.confirmPassword) {
+        setAdminError("两次输入的新密码不一致。");
+        return;
+      }
+    }
+
+    const saved = await onUpdateAdmin({
+      displayName,
+      username,
+      currentPassword: adminDraft.currentPassword,
+      newPassword: adminDraft.newPassword,
+    });
+
+    if (saved) {
+      setAdminDraft((current) => ({
+        ...current,
+        displayName: displayName || "陈列管理员",
+        username,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      }));
+      setAdminDirty(false);
+    }
   }
 
   if (!isAuthed) {
@@ -1851,6 +1955,79 @@ function SettingsPanel({
           </button>
         </div>
       </form>
+      {adminUser ? (
+        <form className="settings-card admin-account-card" onSubmit={handleAdminSubmit}>
+          <div>
+            <h2>管理员账号</h2>
+            <p className="settings-note">
+              修改用户名或密码前，需要输入当前密码确认身份。
+            </p>
+          </div>
+          <div className="form-grid admin-account-grid">
+            <label>
+              <span>显示名称</span>
+              <input
+                value={adminDraft.displayName}
+                onChange={(event) =>
+                  updateAdminDraft("displayName", event.target.value)
+                }
+                placeholder="陈列管理员"
+              />
+            </label>
+            <label>
+              <span>管理员用户名</span>
+              <input
+                value={adminDraft.username}
+                onChange={(event) =>
+                  updateAdminDraft("username", event.target.value)
+                }
+                autoComplete="username"
+              />
+            </label>
+            <label>
+              <span>当前密码</span>
+              <input
+                type="password"
+                value={adminDraft.currentPassword}
+                onChange={(event) =>
+                  updateAdminDraft("currentPassword", event.target.value)
+                }
+                autoComplete="current-password"
+              />
+            </label>
+            <label>
+              <span>新密码</span>
+              <input
+                type="password"
+                value={adminDraft.newPassword}
+                onChange={(event) =>
+                  updateAdminDraft("newPassword", event.target.value)
+                }
+                autoComplete="new-password"
+                placeholder="留空则不修改"
+              />
+            </label>
+            <label>
+              <span>确认新密码</span>
+              <input
+                type="password"
+                value={adminDraft.confirmPassword}
+                onChange={(event) =>
+                  updateAdminDraft("confirmPassword", event.target.value)
+                }
+                autoComplete="new-password"
+                placeholder="再次输入新密码"
+              />
+            </label>
+          </div>
+          {adminError ? <p className="field-error">{adminError}</p> : null}
+          <div className="admin-account-actions">
+            <button className="button primary" type="submit">
+              保存管理员账号
+            </button>
+          </div>
+        </form>
+      ) : null}
     </main>
   );
 }

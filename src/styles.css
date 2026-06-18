@@ -240,31 +240,38 @@ select:focus-visible {
 }
 
 .font-kuaile {
-  --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-ui: "ZCOOL KuaiLe", "Noto Sans SC Variable", "Microsoft YaHei UI", sans-serif;
   --font-display: "ZCOOL KuaiLe", "Noto Sans SC Variable", sans-serif;
   --font-brand: "ZCOOL KuaiLe", "Noto Sans SC Variable", sans-serif;
   font-family: var(--font-ui);
 }
 
 .font-xiaowei {
-  --font-ui: "Noto Serif SC", "Noto Sans SC Variable", "Songti SC", serif;
+  --font-ui: "ZCOOL XiaoWei", "Noto Serif SC", "Songti SC", serif;
   --font-display: "ZCOOL XiaoWei", "Noto Serif SC", "Songti SC", serif;
   --font-brand: "ZCOOL XiaoWei", "Noto Serif SC", serif;
   font-family: var(--font-ui);
 }
 
 .font-mashan {
-  --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-ui: "Ma Shan Zheng", "LXGW WenKai", "Noto Serif SC", serif;
   --font-display: "Ma Shan Zheng", "Noto Serif SC", "Songti SC", serif;
   --font-brand: "Ma Shan Zheng", "Noto Serif SC", serif;
   font-family: var(--font-ui);
 }
 
 .font-longcang {
-  --font-ui: "Noto Sans SC Variable", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  --font-ui: "Long Cang", "LXGW WenKai", "Noto Serif SC", serif;
   --font-display: "Long Cang", "LXGW WenKai", "Noto Serif SC", serif;
   --font-brand: "Long Cang", "LXGW WenKai", serif;
   font-family: var(--font-ui);
+}
+
+.font-kuaile,
+.font-xiaowei,
+.font-mashan,
+.font-longcang {
+  text-rendering: geometricPrecision;
 }
 
 .font-kuaile .age-copy h1,
@@ -1559,6 +1566,24 @@ textarea {
   gap: 12px;
 }
 
+.admin-account-card {
+  max-width: 920px;
+}
+
+.admin-account-card > div:first-child {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-account-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-account-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .drawer-backdrop,
 .modal-backdrop {
   position: fixed;
@@ -1996,7 +2021,8 @@ textarea {
 
   .admin-intro,
   .admin-toolbar,
-  .settings-actions {
+  .settings-actions,
+  .admin-account-actions {
     align-items: stretch;
     flex-direction: column;
   }
@@ -2007,6 +2033,10 @@ textarea {
 
   .admin-intro > .button {
     justify-self: stretch;
+  }
+
+  .admin-account-actions .button {
+    width: 100%;
   }
 
   .table-head {
