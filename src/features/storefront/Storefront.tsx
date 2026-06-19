@@ -1,6 +1,7 @@
 import { Archive, ChevronRight, Filter, Image as ImageIcon, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ImageFrame, StatCard, StatusBadge } from "../../components/ui";
+import { preloadImageRecords } from "../../lib/storage";
 import type { Product, ProductStatus, SiteSettings } from "../../lib/types";
 
 export function Storefront({
@@ -63,6 +64,21 @@ export function Storefront({
       return matchesQuery && matchesCategory && matchesStatus;
     });
   }, [catalogProducts, category, query, status]);
+
+  const preloadImageIds = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          selectedProduct?.coverImageId,
+          ...filteredProducts.map((product) => product.coverImageId),
+        ]),
+      ).filter(Boolean),
+    [filteredProducts, selectedProduct?.coverImageId],
+  );
+
+  useEffect(() => {
+    void preloadImageRecords(preloadImageIds);
+  }, [preloadImageIds]);
 
   function resetFilters() {
     setQuery("");
@@ -297,7 +313,9 @@ function ProductDetail({
           <X size={16} />
         </button>
       </div>
-      <ImageFrame imageId={product.coverImageId} alt={product.name} size="detail" />
+      <div className="detail-media">
+        <ImageFrame imageId={product.coverImageId} alt={product.name} size="detail" />
+      </div>
       <h2>{product.name}</h2>
       <p>{product.description}</p>
       <dl className="detail-list">
