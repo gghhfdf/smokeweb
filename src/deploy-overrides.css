@@ -48,10 +48,42 @@
   line-height: 1.2;
 }
 
+.detail-panel {
+  max-height: calc(100vh - 118px);
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.detail-media {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: calc(var(--radius-lg) - 2px);
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.95), rgba(242, 238, 228, 0.76) 62%, rgba(224, 218, 204, 0.58)),
+    var(--surface-muted);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.detail-media .image-detail {
+  min-height: 300px;
+  height: clamp(300px, 32vw, 430px);
+  aspect-ratio: auto;
+  border: 0;
+  background: transparent;
+  padding: 12px;
+}
+
+.detail-media .image-detail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain !important;
+  object-position: center;
+}
+
 .product-card .image-frame img,
 .showcase-body .image-frame img,
 .detail-panel .image-frame img {
-  object-fit: contain;
+  object-fit: contain !important;
   object-position: center;
 }
 
@@ -177,6 +209,11 @@
   .capacity-panel,
   .capacity-facts {
     grid-template-columns: 1fr;
+  }
+
+  .storefront .detail-panel .image-detail {
+    min-height: 240px;
+    height: min(56vh, 360px);
   }
 
   .capacity-refresh {
