@@ -16,21 +16,26 @@ export function ImageFrame({
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    let objectUrl: string | null = null;
+    let nextObjectUrl: string | null = null;
     let alive = true;
 
-    imageRecordToObjectUrl(imageId).then((nextUrl) => {
-      if (!alive) {
-        if (nextUrl) URL.revokeObjectURL(nextUrl);
-        return;
-      }
-      objectUrl = nextUrl;
-      setUrl(nextUrl);
-    });
+    setUrl(null);
+    imageRecordToObjectUrl(imageId)
+      .then((nextUrl) => {
+        if (!alive) {
+          if (nextUrl?.startsWith("blob:")) URL.revokeObjectURL(nextUrl);
+          return;
+        }
+        nextObjectUrl = nextUrl;
+        setUrl(nextUrl);
+      })
+      .catch(() => {
+        if (alive) setUrl(null);
+      });
 
     return () => {
       alive = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (nextObjectUrl?.startsWith("blob:")) URL.revokeObjectURL(nextObjectUrl);
     };
   }, [imageId]);
 
