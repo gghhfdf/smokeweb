@@ -8,6 +8,7 @@ import {
 import type {
   AdminUser,
   AppState,
+  CloudCapacity,
   ExportPayload,
   ImageRecord,
   Product,
@@ -100,6 +101,12 @@ export async function loadCloudState(): Promise<AppState> {
       p_session_token: getCloudSessionToken(),
     }),
   );
+}
+
+export async function loadCloudCapacity(): Promise<CloudCapacity> {
+  return rpc<CloudCapacity>("cabinet_get_capacity", {
+    p_session_token: getCloudSessionToken(),
+  });
 }
 
 export async function createCloudAdmin(admin: AdminUser): Promise<AppState> {

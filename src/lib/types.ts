@@ -86,6 +86,17 @@ export interface ImageCompressionStats {
   iterations: number;
 }
 
+export interface CloudCapacity {
+  databaseBytes: number;
+  databaseLimitBytes: number;
+  imageBytes: number;
+  imageCount: number;
+  productCount: number;
+  averageImageBytes: number;
+  estimatedImageSlots: number;
+  updatedAt: string;
+}
+
 export interface ExportPayload {
   version: 1 | 2;
   exportedAt: string;

@@ -1,7 +1,8 @@
-import { Copy, Eye, EyeOff, Filter, LayoutDashboard, Lock, PackagePlus, Pencil, Search, SlidersHorizontal, Trash2 } from "lucide-react";
+import { Cloud, Copy, Database, Eye, EyeOff, Filter, HardDrive, LayoutDashboard, Lock, PackagePlus, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { EmptyState, ImageFrame, StatCard, StatusBadge } from "../../components/ui";
-import type { Product, ProductSort, ProductStatus } from "../../lib/types";
+import { formatBytes } from "../../lib/imageCompression";
+import type { CloudCapacity, Product, ProductSort, ProductStatus } from "../../lib/types";
 
 export function ProductAdmin({
   products,
@@ -13,9 +14,17 @@ export function ProductAdmin({
   onBulkStatus,
   onBulkDelete,
   onDuplicate,
+  capacity,
+  capacityLoading,
+  cloudEnabled,
+  onRefreshCapacity,
 }: {
   products: Product[];
   isAuthed: boolean;
+  capacity: CloudCapacity | null;
+  capacityLoading: boolean;
+  cloudEnabled: boolean;
+  onRefreshCapacity: () => void | Promise<void>;
   onCreate: () => void;
   onEdit: (product: Product) => void;
   onToggleStatus: (id: string) => void;
@@ -131,6 +140,12 @@ export function ProductAdmin({
         <StatCard label="在售" value={String(liveCount)} />
         <StatCard label="待补图" value={String(missingImageCount)} />
       </section>
+      <CapacityPanel
+        capacity={capacity}
+        loading={capacityLoading}
+        cloudEnabled={cloudEnabled}
+        onRefresh={onRefreshCapacity}
+      />
       <section className="admin-filterbar">
         <div className="search-box">
           <Search size={16} />
@@ -271,5 +286,82 @@ export function ProductAdmin({
         ) : null}
       </section>
     </main>
+  );
+}
+
+function CapacityPanel({
+  capacity,
+  loading,
+  cloudEnabled,
+  onRefresh,
+}: {
+  capacity: CloudCapacity | null;
+  loading: boolean;
+  cloudEnabled: boolean;
+  onRefresh: () => void | Promise<void>;
+}) {
+  const usageRatio =
+    capacity && capacity.databaseLimitBytes > 0
+      ? Math.min(capacity.databaseBytes / capacity.databaseLimitBytes, 1)
+      : 0;
+  const usagePercent = Math.round(usageRatio * 100);
+  const remainingBytes = capacity
+    ? Math.max(capacity.databaseLimitBytes - capacity.databaseBytes, 0)
+    : 0;
+
+  return (
+    <section className="capacity-panel" aria-label="Supabase 云端容量">
+      <div className="capacity-summary">
+        <div className="section-label">
+          <Cloud size={15} />
+          云端余量
+        </div>
+        <h2>Supabase 存储概况</h2>
+        <p>
+          按当前数据库占用与商品图压缩策略估算，可辅助控制图片数量和资料体积。
+        </p>
+      </div>
+      <div className="capacity-meter">
+        <div className="capacity-meter-top">
+          <span>数据库空间</span>
+          <strong>
+            {capacity ? `${formatBytes(capacity.databaseBytes)} / ${formatBytes(capacity.databaseLimitBytes)}` : "等待同步"}
+          </strong>
+        </div>
+        <div className="capacity-bar" aria-hidden="true">
+          <i style={{ width: `${usagePercent}%` }} />
+        </div>
+        <div className="capacity-meter-bottom">
+          <span>已用 {capacity ? `${usagePercent}%` : "--"}</span>
+          <span>剩余 {capacity ? formatBytes(remainingBytes) : "--"}</span>
+        </div>
+      </div>
+      <div className="capacity-facts">
+        <article>
+          <Database size={16} />
+          <span>商品图占用</span>
+          <strong>{capacity ? formatBytes(capacity.imageBytes) : "--"}</strong>
+        </article>
+        <article>
+          <HardDrive size={16} />
+          <span>图片数量</span>
+          <strong>{capacity ? `${capacity.imageCount} 张` : "--"}</strong>
+        </article>
+        <article>
+          <PackagePlus size={16} />
+          <span>约可再传</span>
+          <strong>{capacity ? `${capacity.estimatedImageSlots.toLocaleString("zh-Hans-CN")} 张` : "--"}</strong>
+        </article>
+      </div>
+      <button
+        className="button secondary capacity-refresh"
+        type="button"
+        onClick={onRefresh}
+        disabled={!cloudEnabled || loading}
+      >
+        <RefreshCw size={15} className={loading ? "spinning" : ""} />
+        {loading ? "刷新中" : "刷新容量"}
+      </button>
+    </section>
   );
 }

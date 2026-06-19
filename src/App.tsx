@@ -6,6 +6,7 @@ import {
   createCloudAdmin,
   deleteCloudProduct,
   isCloudEnabled,
+  loadCloudCapacity,
   loadCloudState,
   loginCloudAdmin,
   logoutCloudAdmin,
@@ -38,7 +39,7 @@ import {
   saveSession,
   saveSettings,
 } from "./lib/storage";
-import type { AdminUser, AppState, ExportPayload, Product, ProductStatus, SiteSettings } from "./lib/types";
+import type { AdminUser, AppState, CloudCapacity, ExportPayload, Product, ProductStatus, SiteSettings } from "./lib/types";
 
 export function App() {
   const [state, setState] = useState<AppState>(() => {
@@ -55,6 +56,8 @@ export function App() {
     state.products[0]?.id ?? null,
   );
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [capacity, setCapacity] = useState<CloudCapacity | null>(null);
+  const [capacityLoading, setCapacityLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
     title: string;
     body: string;
@@ -122,6 +125,45 @@ export function App() {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 3200);
   }
+
+  async function refreshCapacity() {
+    if (!isCloudEnabled || !isAuthed) {
+      setCapacity(null);
+      return;
+    }
+
+    setCapacityLoading(true);
+    try {
+      setCapacity(await loadCloudCapacity());
+    } catch (error) {
+      pushToast(error instanceof Error ? error.message : "云端容量暂时无法读取。", "warning");
+    } finally {
+      setCapacityLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (view === "admin" && isAuthed && isCloudEnabled) {
+      let alive = true;
+      setCapacityLoading(true);
+      loadCloudCapacity()
+        .then((nextCapacity) => {
+          if (alive) setCapacity(nextCapacity);
+        })
+        .catch((error) => {
+          if (alive) {
+            pushToast(error instanceof Error ? error.message : "云端容量暂时无法读取。", "warning");
+          }
+        })
+        .finally(() => {
+          if (alive) setCapacityLoading(false);
+        });
+
+      return () => {
+        alive = false;
+      };
+    }
+  }, [view, isAuthed]);
 
   function applyCloudState(cloudState: AppState) {
     setState((current) => ({
@@ -327,6 +369,7 @@ export function App() {
     if (isCloudEnabled) {
       try {
         applyCloudState(await saveCloudProduct(updatedProduct));
+        void refreshCapacity();
         setEditingProduct(null);
         setSelectedProductId(updatedProduct.id);
         pushToast(exists ? "商品档案已更新。" : "商品已加入陈列。");
@@ -352,6 +395,7 @@ export function App() {
     if (isCloudEnabled) {
       try {
         applyCloudState(await setCloudProductStatus(productId, status));
+        void refreshCapacity();
         pushToast("展示状态已更新。");
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "状态切换失败。", "danger");
@@ -377,6 +421,7 @@ export function App() {
     if (isCloudEnabled) {
       try {
         applyCloudState(await bulkCloudProductStatus(status, targetIds));
+        void refreshCapacity();
         pushToast(status === "live" ? "已批量上架。" : "已批量下架。");
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "批量操作失败。", "danger");
@@ -422,6 +467,7 @@ export function App() {
           nextState = await deleteCloudProduct(productId);
         }
         if (nextState) applyCloudState(nextState);
+        void refreshCapacity();
         pushToast(`已删除 ${productIds.length} 个商品。`, "warning");
       } catch (error) {
         pushToast(error instanceof Error ? error.message : "批量删除失败。", "danger");
@@ -472,6 +518,7 @@ export function App() {
       action: async () => {
         if (isCloudEnabled) {
           applyCloudState(await deleteCloudProduct(product.id));
+          void refreshCapacity();
           pushToast("商品已删除。", "warning");
           return;
         }
@@ -493,6 +540,7 @@ export function App() {
       action: async () => {
         if (isCloudEnabled) {
           applyCloudState(await clearCloudAll());
+          void refreshCapacity();
           setView("login");
           pushToast("全部资料已清空。", "warning");
           return;
@@ -625,6 +673,10 @@ export function App() {
             <ProductAdmin
               products={state.products}
               isAuthed={isAuthed}
+              capacity={capacity}
+              capacityLoading={capacityLoading}
+              cloudEnabled={isCloudEnabled}
+              onRefreshCapacity={refreshCapacity}
               onCreate={() => setEditingProduct(makeNewProduct(state.products.length))}
               onEdit={setEditingProduct}
               onToggleStatus={handleToggleStatus}
@@ -682,4 +734,3 @@ export function App() {
     </div>
   );
 }
-

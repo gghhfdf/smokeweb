@@ -4,6 +4,7 @@ import { App } from "./App";
 import "@fontsource-variable/noto-sans-sc";
 import "lxgw-wenkai-webfont/lxgwwenkai-regular.css";
 import "./styles.css";
+import "./deploy-overrides.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
