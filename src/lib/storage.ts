@@ -9,6 +9,7 @@ import {
   importCloudPayload,
   isCloudEnabled,
   listCloudImageRecords,
+  preloadCloudImages,
   removeCloudImage,
   saveCloudImageFile,
 } from "./cloud";
@@ -203,6 +204,14 @@ export async function imageRecordToObjectUrl(
   if (!id) return null;
   const record = await getImageRecord(id);
   return record ? URL.createObjectURL(record.blob) : null;
+}
+
+export async function preloadImageRecords(
+  ids: Array<string | undefined | null>,
+): Promise<void> {
+  if (isCloudEnabled) {
+    await preloadCloudImages(ids);
+  }
 }
 
 export async function buildExportPayload(
