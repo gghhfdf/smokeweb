@@ -43,6 +43,17 @@ interface CloudImagePayload {
   createdAt: string;
 }
 
+const imageDataUrlCache = new Map<string, string | null>();
+const imageResolvers = new Map<
+  string,
+  Array<{
+    resolve: (value: string | null) => void;
+    reject: (error: unknown) => void;
+  }>
+>();
+let imageBatchTimer: number | null = null;
+let imageBatchRpcAvailable = true;
+
 function getClient() {
   if (!supabase) {
     throw new Error("资料同步暂未启用。");
@@ -85,6 +96,115 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
     throw new Error(error.message);
   }
   return data as T;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function withRetry<T>(action: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastError: unknown;
+
+  for (let index = 0; index < attempts; index += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      lastError = error;
+      if (index < attempts - 1) {
+        await wait(180 + index * 220);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+function rememberImages(images: CloudImagePayload[]): Map<string, string | null> {
+  const result = new Map<string, string | null>();
+
+  images.forEach((image) => {
+    imageDataUrlCache.set(image.id, image.dataUrl);
+    result.set(image.id, image.dataUrl);
+  });
+
+  return result;
+}
+
+async function fetchSingleCloudImage(imageId: string): Promise<string | null> {
+  const image = await withRetry(() =>
+    rpc<CloudImagePayload | null>("cabinet_get_image", {
+      p_image_id: imageId,
+    }),
+  );
+  const dataUrl = image?.dataUrl ?? null;
+  imageDataUrlCache.set(imageId, dataUrl);
+  return dataUrl;
+}
+
+async function fetchCloudImages(imageIds: string[]): Promise<Map<string, string | null>> {
+  const uniqueIds = Array.from(new Set(imageIds.filter(Boolean)));
+  if (!uniqueIds.length) return new Map();
+
+  if (imageBatchRpcAvailable) {
+    try {
+      const images = await withRetry(() =>
+        rpc<CloudImagePayload[]>("cabinet_get_images", {
+          p_image_ids: uniqueIds,
+        }),
+      );
+      const result = rememberImages(images);
+      uniqueIds.forEach((id) => {
+        if (!result.has(id)) {
+          imageDataUrlCache.set(id, null);
+          result.set(id, null);
+        }
+      });
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("cabinet_get_images")) {
+        imageBatchRpcAvailable = false;
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  const entries = await Promise.all(
+    uniqueIds.map(async (id) => [id, await fetchSingleCloudImage(id)] as const),
+  );
+  return new Map(entries);
+}
+
+function flushImageBatch() {
+  imageBatchTimer = null;
+  const entries = Array.from(imageResolvers.entries());
+  imageResolvers.clear();
+
+  const ids = entries.map(([id]) => id);
+  fetchCloudImages(ids)
+    .then((result) => {
+      entries.forEach(([id, resolvers]) => {
+        const dataUrl = result.get(id) ?? null;
+        resolvers.forEach(({ resolve }) => resolve(dataUrl));
+      });
+    })
+    .catch((error) => {
+      entries.forEach(([, resolvers]) => {
+        resolvers.forEach(({ reject }) => reject(error));
+      });
+    });
+}
+
+export function clearCloudImageCache(imageIds?: string[]) {
+  if (!imageIds?.length) {
+    imageDataUrlCache.clear();
+    return;
+  }
+
+  imageIds.forEach((id) => imageDataUrlCache.delete(id));
 }
 
 function applySessionResult(result: CloudRpcResult): AppState {
@@ -221,6 +341,7 @@ export async function clearCloudAll(): Promise<AppState> {
     p_session_token: getCloudSessionToken(),
   });
   setCloudSessionToken(null);
+  clearCloudImageCache();
   return normalizeState(state);
 }
 
@@ -236,6 +357,7 @@ export async function saveCloudImageFile(file: File): Promise<ImageRecord> {
     p_data_url: dataUrl,
   });
 
+  imageDataUrlCache.set(record.id, dataUrl);
   return {
     id: record.id,
     name: record.name,
@@ -250,10 +372,33 @@ export async function getCloudImageDataUrl(
   imageId?: string,
 ): Promise<string | null> {
   if (!imageId) return null;
-  const image = await rpc<CloudImagePayload | null>("cabinet_get_image", {
-    p_image_id: imageId,
+  if (imageDataUrlCache.has(imageId)) {
+    return imageDataUrlCache.get(imageId) ?? null;
+  }
+
+  return new Promise((resolve, reject) => {
+    const resolvers = imageResolvers.get(imageId) ?? [];
+    resolvers.push({ resolve, reject });
+    imageResolvers.set(imageId, resolvers);
+
+    if (imageBatchTimer === null) {
+      imageBatchTimer = window.setTimeout(flushImageBatch, 12);
+    }
   });
-  return image?.dataUrl ?? null;
+}
+
+export async function preloadCloudImages(
+  imageIds: Array<string | undefined | null>,
+): Promise<void> {
+  const ids = Array.from(
+    new Set(
+      imageIds.filter(
+        (id): id is string => typeof id === "string" && !imageDataUrlCache.has(id),
+      ),
+    ),
+  );
+  if (!ids.length) return;
+  await fetchCloudImages(ids);
 }
 
 export async function removeCloudImage(imageId: string): Promise<void> {
@@ -261,6 +406,7 @@ export async function removeCloudImage(imageId: string): Promise<void> {
     p_session_token: getCloudSessionToken(),
     p_image_id: imageId,
   });
+  clearCloudImageCache([imageId]);
 }
 
 export async function listCloudImageRecords(): Promise<ImageRecord[]> {
@@ -280,6 +426,7 @@ export async function listCloudImageRecords(): Promise<ImageRecord[]> {
 export async function importCloudPayload(
   payload: ExportPayload,
 ): Promise<AppState> {
+  clearCloudImageCache();
   return normalizeState(
     await rpc<AppState>("cabinet_import_payload", {
       p_session_token: getCloudSessionToken(),
