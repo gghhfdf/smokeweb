@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { hashPassword } from "./lib/auth";
 import {
+  bulkDeleteCloudProducts,
   bulkCloudProductStatus,
   clearCloudAll,
   createCloudAdmin,
@@ -57,6 +58,9 @@ export function App() {
   );
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [capacity, setCapacity] = useState<CloudCapacity | null>(null);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState<
+    "local" | "syncing" | "synced" | "offline"
+  >(isCloudEnabled ? "syncing" : "local");
   const [capacityLoading, setCapacityLoading] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
     title: string;
@@ -79,6 +83,7 @@ export function App() {
     loadCloudState()
       .then((cloudState) => {
         if (!alive) return;
+        setCloudSyncStatus("synced");
         setState((current) => ({
           ...cloudState,
           ageVerified: current.ageVerified,
@@ -91,8 +96,9 @@ export function App() {
         }
       })
       .catch((error) => {
+        setCloudSyncStatus("offline");
         pushToast(
-          error instanceof Error ? error.message : "资料暂时无法读取。",
+          friendlyCloudError(error, "资料暂时未能同步，请稍后刷新。"),
           "danger",
         );
       });
@@ -120,10 +126,28 @@ export function App() {
 
   function pushToast(text: string, kind: ToastKind = "success") {
     const id = crypto.randomUUID();
-    setToasts((current) => [...current, { id, kind, text }]);
+    setToasts((current) =>
+      current.some((toast) => toast.kind === kind && toast.text === text)
+        ? current
+        : [...current, { id, kind, text }],
+    );
     window.setTimeout(() => {
       setToasts((current) => current.filter((toast) => toast.id !== id));
     }, 3200);
+  }
+
+  function friendlyCloudError(error: unknown, fallback: string): string {
+    const message = error instanceof Error ? error.message : "";
+    const normalized = message.toLowerCase();
+    if (
+      !message ||
+      normalized.includes("failed to fetch") ||
+      normalized.includes("network") ||
+      normalized.includes("fetch")
+    ) {
+      return fallback;
+    }
+    return message;
   }
 
   async function refreshCapacity() {
@@ -135,8 +159,10 @@ export function App() {
     setCapacityLoading(true);
     try {
       setCapacity(await loadCloudCapacity());
+      setCloudSyncStatus("synced");
     } catch (error) {
-      pushToast(error instanceof Error ? error.message : "云端容量暂时无法读取。", "warning");
+      setCloudSyncStatus("offline");
+      pushToast(friendlyCloudError(error, "容量暂时无法读取。"), "warning");
     } finally {
       setCapacityLoading(false);
     }
@@ -148,11 +174,15 @@ export function App() {
       setCapacityLoading(true);
       loadCloudCapacity()
         .then((nextCapacity) => {
-          if (alive) setCapacity(nextCapacity);
+          if (alive) {
+            setCapacity(nextCapacity);
+            setCloudSyncStatus("synced");
+          }
         })
         .catch((error) => {
+          if (alive) setCloudSyncStatus("offline");
           if (alive) {
-            pushToast(error instanceof Error ? error.message : "云端容量暂时无法读取。", "warning");
+            pushToast(friendlyCloudError(error, "容量暂时无法读取。"), "warning");
           }
         })
         .finally(() => {
@@ -166,6 +196,9 @@ export function App() {
   }, [view, isAuthed]);
 
   function applyCloudState(cloudState: AppState) {
+    if (isCloudEnabled) {
+      setCloudSyncStatus("synced");
+    }
     setState((current) => ({
       ...cloudState,
       ageVerified: current.ageVerified,
@@ -188,7 +221,7 @@ export function App() {
         applyCloudState(await saveCloudSettings(settings));
         pushToast("展示设置已保存。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "展示设置保存失败。", "danger");
+        pushToast(friendlyCloudError(error, "展示设置保存失败。"), "danger");
       }
       return;
     }
@@ -283,7 +316,7 @@ export function App() {
         setView("storefront");
         pushToast("管理员已创建。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "管理员创建失败。", "danger");
+        pushToast(friendlyCloudError(error, "管理员创建失败。"), "danger");
       }
       return;
     }
@@ -374,7 +407,7 @@ export function App() {
         setSelectedProductId(updatedProduct.id);
         pushToast(exists ? "商品档案已更新。" : "商品已加入陈列。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "商品保存失败。", "danger");
+        pushToast(friendlyCloudError(error, "商品保存失败。"), "danger");
       }
       return;
     }
@@ -398,7 +431,7 @@ export function App() {
         void refreshCapacity();
         pushToast("展示状态已更新。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "状态切换失败。", "danger");
+        pushToast(friendlyCloudError(error, "状态切换失败。"), "danger");
       }
       return;
     }
@@ -417,21 +450,22 @@ export function App() {
   }
 
   async function performBulkStatus(status: ProductStatus, productIds?: string[]) {
-    const targetIds = productIds?.length ? productIds : undefined;
+    const targetIds = productIds?.length ? productIds : [];
+    if (!targetIds.length) return;
     if (isCloudEnabled) {
       try {
         applyCloudState(await bulkCloudProductStatus(status, targetIds));
         void refreshCapacity();
         pushToast(status === "live" ? "已批量上架。" : "已批量下架。");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "批量操作失败。", "danger");
+        pushToast(friendlyCloudError(error, "批量操作失败。"), "danger");
       }
       return;
     }
 
     updateProducts(
       state.products.map((product) =>
-        !targetIds || targetIds.includes(product.id)
+        targetIds.includes(product.id)
           ? {
               ...product,
               status,
@@ -445,15 +479,15 @@ export function App() {
 
   function handleBulkStatus(status: ProductStatus, productIds?: string[]) {
     if (!checkAdmin()) return;
-    const targetCount = productIds?.length ?? state.products.length;
+    const targetCount = productIds?.length ?? 0;
     if (!targetCount) {
-      pushToast("没有可操作的商品。", "warning");
+      pushToast("请先选择要操作的商品。", "warning");
       return;
     }
     const actionText = status === "live" ? "批量上架" : "批量下架";
     setConfirmAction({
-      title: `${actionText}全部商品？`,
-      body: `这会把当前商品列表全部切换为${status === "live" ? "已上架" : "未上架"}状态，确认后立即生效。`,
+      title: `${actionText} ${targetCount} 个商品？`,
+      body: `确认后会把已选商品切换为${status === "live" ? "已上架" : "未上架"}状态。`,
       action: () => performBulkStatus(status, productIds),
     });
   }
@@ -462,15 +496,11 @@ export function App() {
     if (!productIds.length) return;
     if (isCloudEnabled) {
       try {
-        let nextState: AppState | null = null;
-        for (const productId of productIds) {
-          nextState = await deleteCloudProduct(productId);
-        }
-        if (nextState) applyCloudState(nextState);
+        applyCloudState(await bulkDeleteCloudProducts(productIds));
         void refreshCapacity();
         pushToast(`已删除 ${productIds.length} 个商品。`, "warning");
       } catch (error) {
-        pushToast(error instanceof Error ? error.message : "批量删除失败。", "danger");
+        pushToast(friendlyCloudError(error, "批量删除失败。"), "danger");
       }
       return;
     }
@@ -628,6 +658,7 @@ export function App() {
         view={view}
         isAuthed={isAuthed}
         cloudEnabled={isCloudEnabled}
+        cloudStatus={cloudSyncStatus}
         hasAdmin={Boolean(state.adminUser)}
         onNavigate={(nextView) => {
           if (nextView === "admin" || nextView === "settings") {
