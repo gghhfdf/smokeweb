@@ -90,11 +90,16 @@ export interface CloudCapacity {
   databaseBytes: number;
   databaseLimitBytes: number;
   imageBytes: number;
+  decodedImageBytes?: number;
   imageCount: number;
   productCount: number;
   averageImageBytes: number;
+  averageDecodedImageBytes?: number;
+  largestImageBytes?: number;
   estimatedImageSlots: number;
   updatedAt: string;
+  lastCheckedAt?: string;
+  quotaWarnings?: string[];
 }
 
 export interface ExportPayload {
