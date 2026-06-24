@@ -53,6 +53,7 @@ const imageResolvers = new Map<
 >();
 let imageBatchTimer: number | null = null;
 let imageBatchRpcAvailable = true;
+const IMAGE_BATCH_LIMIT = 80;
 
 function getClient() {
   if (!supabase) {
@@ -132,6 +133,14 @@ function rememberImages(images: CloudImagePayload[]): Map<string, string | null>
   return result;
 }
 
+function chunkItems<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    chunks.push(items.slice(index, index + size));
+  }
+  return chunks;
+}
+
 async function fetchSingleCloudImage(imageId: string): Promise<string | null> {
   const image = await withRetry(() =>
     rpc<CloudImagePayload | null>("cabinet_get_image", {
@@ -149,12 +158,16 @@ async function fetchCloudImages(imageIds: string[]): Promise<Map<string, string 
 
   if (imageBatchRpcAvailable) {
     try {
-      const images = await withRetry(() =>
-        rpc<CloudImagePayload[]>("cabinet_get_images", {
-          p_image_ids: uniqueIds,
-        }),
+      const imageBatches = await Promise.all(
+        chunkItems(uniqueIds, IMAGE_BATCH_LIMIT).map((ids) =>
+          withRetry(() =>
+            rpc<CloudImagePayload[]>("cabinet_get_images", {
+              p_image_ids: ids,
+            }),
+          ),
+        ),
       );
-      const result = rememberImages(images);
+      const result = rememberImages(imageBatches.flat());
       uniqueIds.forEach((id) => {
         if (!result.has(id)) {
           imageDataUrlCache.set(id, null);
@@ -224,9 +237,14 @@ export async function loadCloudState(): Promise<AppState> {
 }
 
 export async function loadCloudCapacity(): Promise<CloudCapacity> {
-  return rpc<CloudCapacity>("cabinet_get_capacity", {
+  const capacity = await rpc<CloudCapacity>("cabinet_get_capacity", {
     p_session_token: getCloudSessionToken(),
   });
+  return {
+    ...capacity,
+    lastCheckedAt: capacity.lastCheckedAt ?? capacity.updatedAt,
+    quotaWarnings: capacity.quotaWarnings ?? [],
+  };
 }
 
 export async function createCloudAdmin(admin: AdminUser): Promise<AppState> {
@@ -299,6 +317,15 @@ export async function deleteCloudProduct(productId: string): Promise<AppState> {
     await rpc<AppState>("cabinet_delete_product", {
       p_session_token: getCloudSessionToken(),
       p_product_id: productId,
+    }),
+  );
+}
+
+export async function bulkDeleteCloudProducts(productIds: string[]): Promise<AppState> {
+  return normalizeState(
+    await rpc<AppState>("cabinet_bulk_delete", {
+      p_session_token: getCloudSessionToken(),
+      p_product_ids: productIds,
     }),
   );
 }
