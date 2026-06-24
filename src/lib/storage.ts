@@ -5,6 +5,7 @@ import {
   normalizeSettings,
 } from "./defaults";
 import {
+  clearCloudImageCache,
   getCloudImageDataUrl,
   importCloudPayload,
   isCloudEnabled,
@@ -211,6 +212,12 @@ export async function preloadImageRecords(
 ): Promise<void> {
   if (isCloudEnabled) {
     await preloadCloudImages(ids);
+  }
+}
+
+export function clearImageCache(ids?: string[]): void {
+  if (isCloudEnabled) {
+    clearCloudImageCache(ids);
   }
 }
 
