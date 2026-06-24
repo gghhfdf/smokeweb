@@ -1,11 +1,14 @@
 import { Cloud, LogIn, LogOut, PackagePlus } from "lucide-react";
 import type { View } from "../lib/appTypes";
 
+type CloudStatus = "local" | "syncing" | "synced" | "offline";
+
 export function TopNav({
   brandName,
   view,
   isAuthed,
   cloudEnabled,
+  cloudStatus,
   hasAdmin,
   onNavigate,
   onLogin,
@@ -16,12 +19,24 @@ export function TopNav({
   view: View;
   isAuthed: boolean;
   cloudEnabled: boolean;
+  cloudStatus: CloudStatus;
   hasAdmin: boolean;
   onNavigate: (view: View) => void;
   onLogin: () => void;
   onLogout: () => void;
   onCreate: () => void;
 }) {
+  const statusLabel =
+    cloudStatus === "syncing"
+      ? "云端同步中"
+      : cloudStatus === "synced"
+        ? "资料已同步"
+        : cloudStatus === "offline"
+          ? "暂未连接"
+          : cloudEnabled
+            ? "云端待连接"
+            : "本机整理";
+
   return (
     <header className="top-nav">
       <button
@@ -61,9 +76,9 @@ export function TopNav({
         ) : null}
       </nav>
       <div className="nav-actions">
-        <div className="cloud-status" aria-label={cloudEnabled ? "资料已同步" : "离线预览"}>
+        <div className={`cloud-status cloud-status-${cloudStatus}`} aria-label={statusLabel}>
           <Cloud size={15} />
-          <span>{cloudEnabled ? "资料已同步" : "离线预览"}</span>
+          <span>{statusLabel}</span>
           <i>{isAuthed ? "管理员" : "游客模式"}</i>
         </div>
         {isAuthed ? (
