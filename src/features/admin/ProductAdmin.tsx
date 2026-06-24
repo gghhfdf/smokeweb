@@ -81,7 +81,7 @@ export function ProductAdmin({
   }, [category, imageFilter, products, query, sortBy, status]);
   const visibleIds = filteredProducts.map((product) => product.id);
   const selectedVisibleIds = selectedIds.filter((id) => visibleIds.includes(id));
-  const bulkIds = selectedVisibleIds.length ? selectedVisibleIds : visibleIds;
+  const bulkIds = selectedVisibleIds;
   const allVisibleSelected =
     visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
 
@@ -192,16 +192,31 @@ export function ProductAdmin({
       <section className="admin-toolbar">
         <div className="section-label">
           <SlidersHorizontal size={15} />
-          展示状态
+          已选 {selectedVisibleIds.length} 个商品
         </div>
         <div>
-          <button className="button secondary" type="button" onClick={() => onBulkStatus("live", bulkIds)}>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={!bulkIds.length}
+            onClick={() => onBulkStatus("live", bulkIds)}
+          >
             批量上架
           </button>
-          <button className="button secondary" type="button" onClick={() => onBulkStatus("draft", bulkIds)}>
+          <button
+            className="button secondary"
+            type="button"
+            disabled={!bulkIds.length}
+            onClick={() => onBulkStatus("draft", bulkIds)}
+          >
             批量下架
           </button>
-          <button className="button danger ghost" type="button" onClick={() => onBulkDelete(bulkIds)}>
+          <button
+            className="button danger ghost"
+            type="button"
+            disabled={!bulkIds.length}
+            onClick={() => onBulkDelete(bulkIds)}
+          >
             批量删除
           </button>
         </div>
@@ -236,7 +251,7 @@ export function ProductAdmin({
               />
             </label>
             <div className="table-product">
-              <ImageFrame imageId={product.coverImageId} alt={product.name} size="thumb" />
+              <ImageFrame imageId={product.coverImageId} alt={product.name} size="thumb" priority />
               <div>
                 <strong>{product.name}</strong>
                 <span>{product.subtitle || "未填写副标题"}</span>
@@ -308,17 +323,23 @@ function CapacityPanel({
   const remainingBytes = capacity
     ? Math.max(capacity.databaseLimitBytes - capacity.databaseBytes, 0)
     : 0;
+  const decodedImageBytes = capacity?.decodedImageBytes ?? capacity?.imageBytes ?? 0;
+  const averageDecodedImageBytes =
+    capacity?.averageDecodedImageBytes ?? capacity?.averageImageBytes ?? 0;
+  const largestImageBytes = capacity?.largestImageBytes ?? 0;
+  const lastCheckedAt = capacity?.lastCheckedAt ?? capacity?.updatedAt;
+  const warnings = capacity?.quotaWarnings ?? [];
 
   return (
-    <section className="capacity-panel" aria-label="Supabase 云端容量">
+    <section className="capacity-panel" aria-label="云端容量">
       <div className="capacity-summary">
         <div className="section-label">
           <Cloud size={15} />
           云端余量
         </div>
-        <h2>Supabase 存储概况</h2>
+        <h2>资料容量概况</h2>
         <p>
-          按当前数据库占用与商品图压缩策略估算，可辅助控制图片数量和资料体积。
+          按当前商品图体积估算剩余空间，帮助控制上传数量与图片大小。
         </p>
       </div>
       <div className="capacity-meter">
@@ -339,20 +360,51 @@ function CapacityPanel({
       <div className="capacity-facts">
         <article>
           <Database size={16} />
-          <span>商品图占用</span>
+          <span>数据占用</span>
           <strong>{capacity ? formatBytes(capacity.imageBytes) : "--"}</strong>
         </article>
         <article>
           <HardDrive size={16} />
-          <span>图片数量</span>
-          <strong>{capacity ? `${capacity.imageCount} 张` : "--"}</strong>
+          <span>图片 / 商品</span>
+          <strong>{capacity ? `${capacity.imageCount} / ${capacity.productCount}` : "--"}</strong>
         </article>
         <article>
           <PackagePlus size={16} />
           <span>约可再传</span>
           <strong>{capacity ? `${capacity.estimatedImageSlots.toLocaleString("zh-Hans-CN")} 张` : "--"}</strong>
         </article>
+        <article>
+          <Database size={16} />
+          <span>原图体积</span>
+          <strong>{capacity ? formatBytes(decodedImageBytes) : "--"}</strong>
+        </article>
+        <article>
+          <HardDrive size={16} />
+          <span>平均 / 最大</span>
+          <strong>
+            {capacity ? `${formatBytes(averageDecodedImageBytes)} / ${formatBytes(largestImageBytes)}` : "--"}
+          </strong>
+        </article>
+        <article>
+          <RefreshCw size={16} />
+          <span>最近刷新</span>
+          <strong>
+            {lastCheckedAt
+              ? new Date(lastCheckedAt).toLocaleTimeString("zh-Hans-CN", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "--"}
+          </strong>
+        </article>
       </div>
+      {warnings.length ? (
+        <div className="capacity-warnings">
+          {warnings.map((warning) => (
+            <span key={warning}>{warning}</span>
+          ))}
+        </div>
+      ) : null}
       <button
         className="button secondary capacity-refresh"
         type="button"
