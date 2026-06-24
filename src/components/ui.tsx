@@ -1,25 +1,32 @@
-import { AlertTriangle, Check, Image as ImageIcon, X } from "lucide-react";
+import { AlertTriangle, Check, Image as ImageIcon, RefreshCw, X } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import type { ToastMessage } from "../lib/appTypes";
-import { imageRecordToObjectUrl } from "../lib/storage";
+import { clearImageCache, imageRecordToObjectUrl } from "../lib/storage";
 import type { ProductStatus } from "../lib/types";
 
 export function ImageFrame({
   imageId,
   alt,
   size = "card",
+  fit = "contain",
+  priority = false,
 }: {
   imageId?: string;
   alt: string;
   size?: "card" | "hero" | "detail" | "thumb" | "editor";
+  fit?: "contain" | "cover";
+  priority?: boolean;
 }) {
   const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let nextObjectUrl: string | null = null;
     let alive = true;
 
     setUrl(null);
+    setFailed(false);
     imageRecordToObjectUrl(imageId)
       .then((nextUrl) => {
         if (!alive) {
@@ -28,25 +35,45 @@ export function ImageFrame({
         }
         nextObjectUrl = nextUrl;
         setUrl(nextUrl);
+        setFailed(Boolean(imageId && !nextUrl));
       })
       .catch(() => {
-        if (alive) setUrl(null);
+        if (alive) {
+          setUrl(null);
+          setFailed(Boolean(imageId));
+        }
       });
 
     return () => {
       alive = false;
       if (nextObjectUrl?.startsWith("blob:")) URL.revokeObjectURL(nextObjectUrl);
     };
-  }, [imageId]);
+  }, [imageId, retryKey]);
+
+  function retryImage() {
+    if (imageId) clearImageCache([imageId]);
+    setRetryKey((current) => current + 1);
+  }
 
   return (
-    <div className={`image-frame image-${size}`}>
+    <div className={`image-frame image-${size} image-fit-${fit}`}>
       {url ? (
-        <img src={url} alt={alt} />
+        <img
+          src={url}
+          alt={alt}
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+        />
       ) : (
         <div className="image-empty">
           <ImageIcon size={size === "thumb" ? 18 : 26} />
-          <span>{size === "thumb" ? "待传" : "待上传商品图"}</span>
+          <span>{failed ? "图片暂未载入" : size === "thumb" ? "待传" : "待上传商品图"}</span>
+          {failed ? (
+            <button className="image-retry" type="button" onClick={retryImage}>
+              <RefreshCw size={13} />
+              重试
+            </button>
+          ) : null}
         </div>
       )}
     </div>
@@ -66,7 +93,7 @@ export function ImageThumb({
 }) {
   return (
     <div className={`image-thumb ${selected ? "selected" : ""}`}>
-      <ImageFrame imageId={imageId} alt="商品缩略图" size="thumb" />
+      <ImageFrame imageId={imageId} alt="商品缩略图" size="thumb" priority />
       <button type="button" onClick={onCover}>
         {selected ? "封面" : "设封面"}
       </button>
