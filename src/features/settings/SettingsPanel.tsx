@@ -386,8 +386,13 @@ export function SettingsPanel({
             <button className="button secondary" type="button" onClick={restoreDefaultSettings}>
               恢复默认展示
             </button>
-            <button className="button primary" type="button" onClick={handleSaveSettings}>
-              保存设置
+            <button
+              className="button primary"
+              type="button"
+              onClick={handleSaveSettings}
+              disabled={!isDirty}
+            >
+              {isDirty ? "保存设置" : "已是最新"}
             </button>
           </div>
         </div>
@@ -396,7 +401,7 @@ export function SettingsPanel({
           <p className="settings-note">
             {isCloudEnabled
               ? "商品、图片与展示设置会保持同步；年龄确认会按访客环境记住。"
-              : "当前为离线预览，适合临时整理陈列内容。"}
+              : "当前先在本设备整理内容，连接云端后再同步展示资料。"}
           </p>
           <div className="compression-summary">
             <Gauge size={17} />

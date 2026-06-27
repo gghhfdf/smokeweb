@@ -23,13 +23,16 @@ export function Storefront({
   const [detailOpen, setDetailOpen] = useState(false);
 
   const catalogProducts = useMemo(() => {
-    return [...products].sort((a, b) => {
+    const sourceProducts = isAuthed
+      ? products
+      : products.filter((product) => product.status === "live");
+    return [...sourceProducts].sort((a, b) => {
       if (settings.defaultSort === "manual") return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
       if (settings.defaultSort === "name") return a.name.localeCompare(b.name, "zh-Hans-CN");
       if (settings.defaultSort === "price") return Number(a.price) - Number(b.price);
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-  }, [products, settings.defaultSort]);
+  }, [isAuthed, products, settings.defaultSort]);
 
   const categories = useMemo(
     () => ["全部", ...Array.from(new Set(catalogProducts.map((item) => item.category)))],
@@ -37,6 +40,7 @@ export function Storefront({
   );
   const liveCount = products.filter((item) => item.status === "live").length;
   const draftCount = products.length - liveCount;
+  const imageReadyCount = catalogProducts.filter((item) => item.coverImageId).length;
   const selectedProduct =
     catalogProducts.find((product) => product.id === selectedProductId) ??
     catalogProducts[0];
@@ -60,17 +64,17 @@ export function Storefront({
         : true;
       const matchesCategory =
         category === "全部" ? true : product.category === category;
-      const matchesStatus = status === "all" ? true : product.status === status;
+      const matchesStatus = !isAuthed || status === "all" ? true : product.status === status;
       return matchesQuery && matchesCategory && matchesStatus;
     });
-  }, [catalogProducts, category, query, status]);
+  }, [catalogProducts, category, isAuthed, query, status]);
 
   const preloadImageIds = useMemo(
     () =>
       Array.from(
         new Set([
           selectedProduct?.coverImageId,
-          ...filteredProducts.map((product) => product.coverImageId),
+          ...filteredProducts.slice(0, 18).map((product) => product.coverImageId),
         ]),
       ).filter(Boolean),
     [filteredProducts, selectedProduct?.coverImageId],
@@ -115,13 +119,14 @@ export function Storefront({
         <div className="showcase-panel">
           <div className="showcase-toolbar">
             <span>今日陈列</span>
-            <span>{isAuthed ? "管理视图" : "游客浏览"}</span>
+            <span>{isAuthed ? "预览中" : "品牌目录"}</span>
           </div>
           <div className="showcase-body">
             <ImageFrame
               imageId={selectedProduct?.coverImageId}
               alt={selectedProduct?.name ?? "商品图"}
               size="hero"
+              priority
             />
             <div>
               <h2>{selectedProduct?.name ?? "暂无商品"}</h2>
@@ -140,12 +145,12 @@ export function Storefront({
         </div>
         <aside className="hero-stats" aria-label="陈列概况">
           <StatCard label="在售" value={String(liveCount)} />
-          <StatCard label="未上架" value={String(draftCount)} />
+          <StatCard label={isAuthed ? "未上架" : "系列"} value={String(isAuthed ? draftCount : categories.length - 1)} />
           <StatCard
             label="图片完整"
             value={`${Math.round(
-              (products.filter((item) => item.coverImageId).length /
-                Math.max(products.length, 1)) *
+              (imageReadyCount /
+                Math.max(catalogProducts.length, 1)) *
                 100,
             )}%`}
           />
@@ -173,29 +178,32 @@ export function Storefront({
             </button>
           ))}
         </div>
-        <div className="segmented compact" aria-label="状态筛选">
-          <button
-            className={status === "all" ? "active" : ""}
-            type="button"
-            onClick={() => setStatus("all")}
-          >
-            全部
-          </button>
-          <button
-            className={status === "live" ? "active" : ""}
-            type="button"
-            onClick={() => setStatus("live")}
-          >
-            已上架
-          </button>
-          <button
-            className={status === "draft" ? "active" : ""}
-            type="button"
-            onClick={() => setStatus("draft")}
-          >
-            未上架
-          </button>
-        </div>
+        {isAuthed ? (
+          <div className="segmented compact" aria-label="状态筛选">
+            <button
+              className={status === "all" ? "active" : ""}
+              type="button"
+              onClick={() => setStatus("all")}
+            >
+              全部
+            </button>
+            <button
+              className={status === "live" ? "active" : ""}
+              type="button"
+              onClick={() => setStatus("live")}
+            >
+              已上架
+            </button>
+            <button
+              className={status === "draft" ? "active" : ""}
+              type="button"
+              onClick={() => setStatus("draft")}
+            >
+              未上架
+            </button>
+          </div>
+        ) : null}
+        <p className="filter-summary">{filteredProducts.length} 款陈列</p>
       </section>
 
       <section className="store-grid-wrap">
@@ -206,6 +214,7 @@ export function Storefront({
                 key={product.id}
                 product={product}
                 settings={settings}
+                showStatus={isAuthed}
                 selected={selectedProduct?.id === product.id}
                 onSelect={() => selectProduct(product.id)}
               />
@@ -223,6 +232,7 @@ export function Storefront({
         <ProductDetail
           product={selectedProduct}
           settings={settings}
+          showStatus={isAuthed}
           open={detailOpen}
           onClose={() => setDetailOpen(false)}
         />
@@ -235,11 +245,13 @@ function ProductCard({
   product,
   settings,
   selected,
+  showStatus,
   onSelect,
 }: {
   product: Product;
   settings: SiteSettings;
   selected: boolean;
+  showStatus: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -248,10 +260,11 @@ function ProductCard({
         <ImageFrame
           imageId={product.coverImageId}
           alt={product.imageMeta?.[product.coverImageId ?? ""]?.alt || product.name}
+          fit="contain"
         />
       </button>
       <div className="product-card-body">
-        <StatusBadge status={product.status} />
+        {showStatus ? <StatusBadge status={product.status} /> : null}
         <button className="product-title-button" type="button" onClick={onSelect}>
           <h2>{product.name}</h2>
           <p>{product.subtitle}</p>
@@ -284,11 +297,13 @@ function ProductCard({
 function ProductDetail({
   product,
   settings,
+  showStatus,
   open,
   onClose,
 }: {
   product?: Product;
   settings: SiteSettings;
+  showStatus: boolean;
   open: boolean;
   onClose: () => void;
 }) {
@@ -308,13 +323,13 @@ function ProductDetail({
     <aside className={`detail-panel ${open ? "open" : ""}`}>
       <div className="detail-header">
         <span>当前选中</span>
-        <StatusBadge status={product.status} />
+        {showStatus ? <StatusBadge status={product.status} /> : null}
         <button className="icon-button mobile-only" type="button" onClick={onClose} aria-label="关闭详情">
           <X size={16} />
         </button>
       </div>
       <div className="detail-media">
-        <ImageFrame imageId={product.coverImageId} alt={product.name} size="detail" />
+        <ImageFrame imageId={product.coverImageId} alt={product.name} size="detail" fit="contain" priority />
       </div>
       <h2>{product.name}</h2>
       <p>{product.description}</p>

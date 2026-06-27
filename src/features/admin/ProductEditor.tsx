@@ -25,6 +25,8 @@ export function ProductEditor({
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [validationError, setValidationError] = useState("");
   const [uploadReports, setUploadReports] = useState<UploadReport[]>([]);
+  const [uploadedImageIds, setUploadedImageIds] = useState<string[]>([]);
+  const [pendingRemovalIds, setPendingRemovalIds] = useState<string[]>([]);
   const baseline = useMemo(() => JSON.stringify(product), [product]);
   const isDirty = useMemo(() => JSON.stringify(draft) !== baseline, [baseline, draft]);
 
@@ -64,8 +66,10 @@ export function ProductEditor({
       const records = await Promise.all(
         Array.from(files).map((file) => saveImageFile(file)),
       );
+      const nextImageIds = records.map((record) => record.id);
+      setUploadedImageIds((current) => [...current, ...nextImageIds]);
       setDraft((current) => {
-        const imageIds = [...current.imageIds, ...records.map((record) => record.id)];
+        const imageIds = [...current.imageIds, ...nextImageIds];
         return {
           ...current,
           imageIds,
@@ -103,8 +107,10 @@ export function ProductEditor({
     void handleFiles(Array.from(event.dataTransfer.files));
   }
 
-  async function handleRemoveImage(imageId: string) {
-    await removeImage(imageId);
+  function handleRemoveImage(imageId: string) {
+    setPendingRemovalIds((current) =>
+      current.includes(imageId) ? current : [...current, imageId],
+    );
     setDraft((current) => {
       const imageIds = current.imageIds.filter((id) => id !== imageId);
       return {
@@ -117,6 +123,11 @@ export function ProductEditor({
         ),
       };
     });
+  }
+
+  async function cleanupUnsavedUploads() {
+    const ids = uploadedImageIds.filter((imageId) => !product.imageIds.includes(imageId));
+    await Promise.all(ids.map((imageId) => removeImage(imageId)));
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -150,6 +161,10 @@ export function ProductEditor({
         price: Number(draft.price),
         stock: Number(draft.stock),
       });
+      const removableIds = pendingRemovalIds.filter(
+        (imageId) => !draft.imageIds.includes(imageId),
+      );
+      await Promise.all(removableIds.map((imageId) => removeImage(imageId)));
     } finally {
       setIsSaving(false);
     }
@@ -387,7 +402,8 @@ export function ProductEditor({
           title="放弃未保存修改？"
           body="当前商品信息还没有保存，关闭后本次修改不会保留。"
           onCancel={() => setShowCloseConfirm(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
+            await cleanupUnsavedUploads();
             setShowCloseConfirm(false);
             onClose();
           }}

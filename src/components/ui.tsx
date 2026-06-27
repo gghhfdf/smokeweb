@@ -61,7 +61,8 @@ export function ImageFrame({
         <img
           src={url}
           alt={alt}
-          loading={priority ? "eager" : "lazy"}
+          loading="eager"
+          data-priority={priority ? "true" : undefined}
           decoding="async"
         />
       ) : (
